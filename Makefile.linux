@@ -64,3 +64,5 @@ custom_protocol_client: examples/custom_protocol
 	@$< client
 custom_protocol_server: examples/custom_protocol
 	@$< server
+custom_protocol_bomb: examples/custom_protocol
+	@seq 50 | xargs -n1 -P50 $< client &
