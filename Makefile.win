@@ -19,7 +19,7 @@ obj/%.o: %.cpp
 
 examples/%.exe: %.cpp
 	@echo [90m - [96m$<[0m
-	@$(CC) $< -o $@ -lasr -lwsock32
+	@$(CC) $(CCFLAGS) $< -o $@ -lasr -lwsock32
 
 build: lib
 all: clean lib

@@ -19,7 +19,7 @@ obj/%.o: %.cpp
 
 examples/%: %.cpp
 	@echo [90m - [96m$<[0m
-	@$(CC) $< -o $@ -lasr
+	@$(CC) $(CCFLAGS) $< -o $@ -lasr
 
 build: lib
 all: clean lib
