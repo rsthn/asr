@@ -1,0 +1,363 @@
+#ifndef __ASR_UTILS_MAP_H
+#define __ASR_UTILS_MAP_H
+
+#include <asr/utils/LList>
+#include <asr/utils/String>
+#include <asr/utils/Pair>
+#include <asr/utils/Null>
+
+#include <cstdio>
+
+namespace asr {
+namespace utils {
+
+    /**
+    **	Map class (also known as associative array).
+    */
+
+    template<typename K, typename T>
+    class Map
+    {
+        private:
+
+        /**
+        **	Contents of the map.
+        */
+        LList<Pair<K,T>*> *contents;
+
+        public:
+
+        /**
+        **	Constructs a map and sets the bitsPerIndex as specified (defaults to 5).
+        */
+        Map (int bitsPerIndex=5) {
+            contents = new LList<Pair<K,T>*> (bitsPerIndex);
+        }
+
+        /**
+        **	Destroys the map and its contents.
+        */
+        virtual ~Map() {
+            delete contents;
+        }
+
+        /**
+        **	Iterator interface.
+        */
+        using _Iterator = typename LList<Pair<K,T>*>::_Iterator;
+
+        _Iterator begin() { return contents->begin(); }
+        _Iterator end() { return contents->end(); }
+
+        /**
+        **	Traverses the map and destroys all nodes and values. Destruction of values is performed only if type T is a pointer to object.
+        */
+        Map<K,T> *clear() {
+            contents->clear();
+            return this;
+        }
+
+        /**
+        **	Destroys the values of each node.
+        */
+        Map<K,T> *clearValues() {
+            for (auto i = contents->head(); i; i = i->next()) {
+                Destroyer<T>::destroy(i->value->value);
+                i->value->value = Null<T>::get();
+            }
+            return this;
+        }
+
+        /**
+        **	Destroys the keys of each node.
+        */
+        Map<K,T> *clearKeys() {
+            for (auto i = contents->head(); i; i = i->next()) {
+                Destroyer<K>::destroy(i->value->key);
+                i->value->key = Null<K>::get();
+            }
+            return this;
+        }
+
+        /**
+        **	Traverses the map and destroys all nodes. Values are preserved.
+        */
+        Map<K,T> *reset() {
+            contents->reset();
+            contents->clear();
+            return this;
+        }
+
+        /**
+        **	Returns the number of items in the map.
+        */
+        int length() {
+            return contents->length();
+        }
+
+        /**
+        **	Returns a list of Pair<K,T>* with the contents of the map.
+        */
+        LList<Pair<K,T>*> *getData() {
+            return contents;
+        }
+
+        /**
+        **	Returns boolean indicating if the property exists in the map.
+        */
+        bool has (K key) {
+            return contents->contains(key);
+        }
+
+        /**
+        **	Returns a property given its key.
+        */
+        T get (K key) {
+            auto node = contents->get(key);
+            return node == nullptr ? Null<T>::get() : node->value;
+        }
+
+        /**
+        **	Returns a property node given its key.
+        */
+        Pair<K,T> *getNode (K key) {
+            return contents->get(key);
+        }
+
+        /**
+        **	Sets the value of a property. If the key already exists the previous value will be deleted (if _delete is true) and the new value will be stored.
+        */
+        Map *set (K key, T value, bool _delete=true)
+        {
+            Pair<K,T> *item = contents->get(key);
+            if (item == nullptr) {
+                item = new Pair<K,T> (key, value);
+                contents->push (item);
+            }
+            else {
+                if (_delete && item->value != value) Destroyer<T>::destroy(item->value);
+                item->value = value;
+            }
+
+            return this;
+        }
+
+        /**
+        **	Removes a property from the map given its key and returns it, unless the _delete parameter is set to true in which case nullptr will be
+        **	returned and the property will be removed and deleted.
+        */
+        T remove (K key, bool _delete=true)
+        {
+            Linkable<Pair<K,T>*> *item = contents->getNode(key);
+            if (item == nullptr) return Null<T>::get();
+
+            Pair<K,T> *i = contents->remove(item);
+            if (i == nullptr) return Null<T>::get();
+
+            if (_delete) {
+                delete i;
+                return Null<T>::get();
+            }
+
+            T value = i->value;
+            i->value = Null<T>::get();
+
+            delete i;
+            return value;
+        }
+    };
+
+
+    /**
+     * @brief Template specialization for string keys.
+     */
+    template<typename T>
+    class Map<const String*, T>
+    {
+        private:
+
+        /**
+        **	Contents of the map.
+        */
+        LList<Pair<const String*,T>*> *contents;
+
+        public:
+
+        /**
+        **	Constructs a map and sets the bitsPerIndex as specified (defaults to 5).
+        */
+        Map (int bitsPerIndex=5) {
+            contents = new LList<Pair<const String*,T>*> (bitsPerIndex);
+        }
+
+        /**
+        **	Destroys the map and its contents.
+        */
+        virtual ~Map() {
+            delete contents->clear();
+        }
+
+        /**
+        **	Iterator interface.
+        */
+        using _Iterator = typename LList<Pair<const String*,T>*>::_Iterator;
+
+        _Iterator begin() { return contents->begin(); }
+        _Iterator end() { return contents->end(); }
+
+        /**
+        **	Traverses the map and destroys all nodes and values. Destruction of values is performed only if type T is a pointer to object.
+        */
+        Map<const String*,T> *clear() {
+            contents->clear();
+            return this;
+        }
+
+        /**
+        **	Destroys the values of each node.
+        */
+        Map<const String*,T> *clearValues() {
+            for (auto i = contents->head(); i; i = i->next()) {
+                Destroyer<T>::destroy(i->value->value);
+                i->value->value = Null<T>::get();
+            }
+            return this;
+        }
+
+        /**
+        **	Destroys the keys of each node.
+        */
+        Map<const String*,T> *clearKeys() {
+            for (auto i = contents->head(); i; i = i->next()) {
+                Destroyer<const String*>::destroy(i->value->key);
+                i->value->key = Null<const String*>::get();
+            }
+            return this;
+        }
+
+        /**
+        **	Traverses the map and destroys all nodes. Values are preserved.
+        */
+        Map<const String*,T> *reset()
+        {
+            for (auto i = contents->head(); i; i = i->next())
+                i->value->reset();
+
+            contents->clear();
+            return this;
+        }
+
+        /**
+        **	Returns the number of items in the map.
+        */
+        int length() { return contents->length(); }
+
+        /**
+        **	Returns a list of Pair<String*,T>* with the contents of the map.
+        */
+        LList<Pair<const String*,T>*> *getData() {
+            return contents;
+        }
+
+        /**
+        **	Returns boolean indicating if the property exists in the map.
+        */
+        bool has (const char *name) {
+            return contents->contains(name);
+        }
+
+        template<typename K> bool has (K name) {
+            return contents->contains(name);
+        }
+
+        /**
+        **	Returns a property given its name.
+        */
+        T get (const char *name) {
+            auto node = contents->get(name);
+            return node == nullptr ? Null<T>::get() : node->value;
+        }
+
+        template<typename K> T get (K name) {
+            auto node = contents->get(name);
+            return node == nullptr ? Null<T>::get() : node->value;
+        }
+
+        /**
+        **	Returns a property node given its name.
+        */
+        Pair<const String*,T> *getNode (const char *name) {
+            return contents->get(name);
+        }
+
+        template<typename K> Pair<const String*,T> *getNode (K name) {
+            return contents->get(name);
+        }
+
+        /**
+        **	Sets the value of a property. If the name already exists the previous value will be deleted (if _delete is true) and the new value will be stored.
+        */
+        Map *set (const char *name, T value, bool _delete=true)
+        {
+            Pair<const String*,T> *item = contents->get(name);
+            if (item == nullptr) {
+                item = new Pair<const String*,T> (new String(name), value);
+                contents->push (item);
+            }
+            else {
+                if (_delete && item->value != value) Destroyer<T>::destroy(item->value);
+                item->value = value;
+            }
+
+            return this;
+        }
+
+        /**
+        **	Sets the value of a property. If the name already exists the previous value will be deleted (if _delete is true) and the new value will be stored.
+        **	Note that the provided 'name' object (String*) will be used only if the key does not exist.
+        */
+        Map *set (const String *name, T value, bool _delete=true)
+        {
+            Pair<const String*,T> *item = contents->get(name);
+            if (item == nullptr) {
+                item = new Pair<const String*,T> (name, value);
+                contents->push(item);
+            }
+            else {
+                if (_delete && item->value != value) Destroyer<T>::destroy(item->value);
+                item->value = value;
+            }
+
+            return this;
+        }
+
+        /**
+        **	Removes a property from the map given its name and returns it, unless the _delete parameter is set to true in which case nullptr will be
+        **	returned and the property will be removed and deleted.
+        */
+        T remove (const char *name, bool _delete=true)
+        {
+            if (name == nullptr) return Null<T>::get();
+
+            Linkable<Pair<const String*,T>*> *item = contents->getNode(name);
+            if (item == nullptr) return Null<T>::get();
+
+            Pair<const String*,T> *i = contents->remove(item);
+            if (i == nullptr) return Null<T>::get();
+
+            if (_delete) {
+                delete i;
+                return Null<T>::get();
+            }
+
+            T value = i->value;
+            i->value = Null<T>::get();
+
+            delete i;
+            return value;
+        }
+    };
+
+}};
+
+#endif

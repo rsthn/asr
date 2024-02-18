@@ -1,0 +1,121 @@
+#ifndef __ASR_DEFS_H
+#define __ASR_DEFS_H
+
+/**
+ * When AST_TRACK_MEMORY is defined as 1, the memory allocation functions will be tracked and checked
+ * for errors and leaks. This is useful for debugging purposes.
+ */
+#ifndef ASR_TRACK_MEMORY
+#define ASR_TRACK_MEMORY 1
+#endif
+
+#define TEMPBUFF_SIZE 1024
+
+#include <cstdint>
+#include <cstdio>
+#include <cassert>
+#include <ctime>
+
+/**
+ * Global definition of standard types.
+ */
+namespace asr
+{
+    /**
+     * @brief Number of memory blocks currently allocated.
+     */
+    extern volatile uint32_t memblocks;
+
+    /**
+     * @brief Amount of bytes currently allocated.
+     */
+    extern volatile uint32_t memsize;
+
+    /**
+     * @brief Peak maximum amount of memory used.
+     */
+    extern volatile uint32_t peak_memsize;
+
+
+    /**
+     * @brief Returns the current time in milliseconds.
+     * @return time_t
+     */
+    time_t millis();
+
+
+    /**
+     * @brief Allocates a block of memory of the given size. Never returns NULL because when no memory is
+     * left an internal error will occur.
+     * 
+     * @param size Amount of bytes to allocate.
+     * @return void*
+     */
+    void *alloc (uint32_t size);
+
+
+    /**
+     * @brief Deallocates a previously allocated block of memory. Detects if the block is correct to avoid
+     * memory errors.
+     * 
+     * @param block 
+     */
+    void dealloc (void *block);
+
+
+    /**
+     * @brief Copies the specified string into a newly allocated buffer.
+     * 
+     * @param value String to copy.
+     * @param length Bytes to copy. If 0, the length is calculated using strlen.
+     * @return char*
+     */
+    char *strclone (const char *value, int length=0);
+
+
+    /**
+     * @brief Returns the next available temporal buffer from the circular queue of temporal buffers. These
+     * are dynamically created (up to 32 buffers of TEMPBUFF_SIZE bytes each), when the `clear` parameter is
+     * true, all buffers will be released and `nullptr` will be returned.
+     * 
+     * @param clear Optional parameter to clear all buffers if `true`.
+     * @return char*
+     */
+    char *tempbuff (bool clear=false);
+
+
+    /**
+     * @brief Converts the given value to string and returns it in a temporal buffer.
+     * @param value 
+     * @return char*
+     */
+    const char *c_str (int value);
+    const char *c_str (uint32_t value);
+    const char *c_str (float value);
+    const char *c_str (double value);
+
+    /**
+     * @brief Enables/disables sending the trace messages to STDOUT.
+     */
+    void stdtrace (bool value);
+
+    /**
+     * @brief Writes a message to the log file.
+     */
+    [[gnu::format(printf,1,2)]]
+    void trace (const char *msg, ...);
+
+    /**
+     * @brief Writes a message to the log file without the new line character at the end (aka "raw").
+     */
+    [[gnu::format(printf,1,2)]]
+    void rtrace (const char *msg, ...);
+
+    /**
+     * @brief Writes a message to the log file (UNICODE).
+     */
+    void wtrace (const wchar_t *msg, ...);
+
+};
+
+#endif

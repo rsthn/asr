@@ -1,0 +1,43 @@
+#ifndef __ASR_UTILS_HASH_H
+#define __ASR_UTILS_HASH_H
+
+#include <type_traits>
+#include <asr/crypto/CRC32>
+
+namespace asr {
+namespace utils {
+
+	/**
+	**	Generic utility to obtain a 32-bit hash of an item of type T.
+	**	When getting hash of objects, their respective classes should implement a getHash() method.
+	**
+	**	Hash<T>::get(T t)
+	*/
+
+	template<typename T, int=
+		1*(std::is_pointer<T>::value) |
+		2*(std::is_arithmetic<T>::value || std::is_arithmetic<typename std::remove_pointer<T>::type>::value) |
+		4*(std::is_class<T>::value || std::is_reference<T>::value || std::is_class<typename std::remove_pointer<T>::type>::value)>
+	struct Hash { };
+
+	template<> /* const character string */
+	struct Hash<const char *> { static inline uint32_t get (const char *t) { return crypto::crc32(t); } };
+
+	template<typename T> /* pointer */
+	struct Hash<T,1> { static inline uint32_t get (T t) { return t != nullptr ? Hash<typename std::remove_pointer<T>::type>::get(*t) : 0; } };
+
+	template<typename T> /* arithmetic */
+	struct Hash<T,2> { static inline uint32_t get (T t) { return (uint32_t)t; } };
+
+	template<typename T> /* pointer to arithmetic */
+	struct Hash<T,3> { static inline uint32_t get (T t) { return t != nullptr ? (uint32_t)*t : 0; } };
+
+	template<typename T> /* class */
+	struct Hash<T,4> { static inline uint32_t get (T t) { return t.getHash(); } };
+
+	template<typename T> /* pointer to class */
+	struct Hash<T,5> { static inline uint32_t get (T t) { return t != nullptr ? t->getHash() : 0; } };
+
+}};
+
+#endif

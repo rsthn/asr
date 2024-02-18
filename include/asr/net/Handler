@@ -1,0 +1,64 @@
+#ifndef __ASR_NET_HANDLER_H
+#define __ASR_NET_HANDLER_H
+
+#include <asr/io/Buffer>
+
+namespace asr {
+namespace net {
+
+    using asr::io::Buffer;
+
+    // Forward class references.
+    class Channel;
+
+    /**
+     * @brief Base class for stream handlers. The responsibility of a handler is simply to take proper actions
+     *  when data arrives on the channel or to initiate communication.
+     */
+
+    class Handler
+    {
+        public:
+
+        /**
+         * @brief Channel related to the handler.
+         */
+        Channel *channel;
+
+        /**
+         */
+        Handler() {
+            channel = nullptr;
+        };
+
+        /**
+         */
+        virtual ~Handler() { }
+
+        /**
+         * @brief Performs actions when the connection is established.
+         * @return Return `false` to close the connection.
+         */
+        virtual bool connected() = 0;
+
+        /**
+         * @brief Executed when the channel's I/O state has been closed.
+         */
+        virtual void disconnected() = 0;
+
+        /**
+         * @brief Performs actions when the channel data needs to be updated.
+         * @return Return `false` to close the connection.
+         */
+        virtual bool update (time_t time, Buffer *output) = 0;
+
+        /**
+         * @brief Interprets data from the stream.
+         * @return Return `false` to close the connection.
+         */
+        virtual bool dataAvailable (Buffer *input, Buffer *output) = 0;
+    };
+
+}};
+
+#endif

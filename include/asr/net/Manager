@@ -1,0 +1,321 @@
+#ifndef __ASR_NET_MANAGER_H
+#define __ASR_NET_MANAGER_H
+
+#include <unistd.h>
+#include <asr/net/Handler>
+#include <asr/net/IUpdate>
+#include <asr/net/Channel>
+
+// Maximum number of channels handled by the manager.
+#ifndef MAX_CHANNELS
+#define MAX_CHANNELS 1024
+#endif
+
+namespace asr {
+namespace net {
+
+    /**
+     * @brief Responsible for controlling all the network channels created in the system, poll status periodically from sockets,
+     * and raise events to handlers when necessary.
+     */
+
+    class Manager
+    {
+        friend class Server;
+
+        protected:
+
+        /**
+         * @brief Array of channels. It's size depends on the MAX_CHANNELS constant.
+         */
+        Channel **channels;
+
+        /**
+         * @brief Indicates if the manager master loop should be terminated.
+         */
+        bool terminate;
+
+        /**
+         * @brief Number of active channels in the system.
+         */
+        int _activeChannels;
+
+        /**
+         * @brief Total number of channels handled by the manager.
+         */
+        int _totalChannels;
+
+
+        public:
+
+        /**
+         * @brief Current manager time, updated to asr::millis() on each main loop cycle.
+         */
+        time_t currTime;
+
+
+        /**
+         */
+        Manager()
+        {
+            size_t size = MAX_CHANNELS * sizeof(Channel*);
+            channels = (Channel **)asr::alloc(size);
+            memset ((char *)channels, 0, size);
+
+            _activeChannels = 0;
+            _totalChannels = 0;
+            terminate = false;
+        }
+
+        /**
+         */
+        virtual ~Manager() {
+        }
+
+        /**
+         * @brief Flags the manager to exit the main loop.
+         */
+        void exit() {
+            terminate = true;
+        }
+
+        /**
+         * @brief Returns the number of active channels in the manager.
+         * @return int
+         */
+        int activeChannels() {
+            return _activeChannels;
+        }
+
+        /**
+         * @brief Returns the total number of handled channels.
+         * @return int
+         */
+        int totalChannels() {
+            return _totalChannels;
+        }
+
+
+        /**
+         * @brief Adds a channel to the manager. If there are errors the channel will be deleted.
+         *
+         * @param channel Channel to add.
+         * @return True if the channel was added, false otherwise.
+         */
+        bool add (Channel *channel)
+        {
+            if (channel == nullptr || !channel->socket->valid()) {
+                if (channel != nullptr)
+                    delete channel;
+                return false;
+            }
+
+            channel->startTime = currTime;
+
+            // Verify if `connected` should be called.
+            if (channel->socket->connected() && channel->stream != nullptr && channel->handler != nullptr)
+            {
+                if (!channel->handler->connected()) {
+                    delete channel;
+                    return false;
+                }
+            }
+
+            // Search for empty spot and store channel there.
+            // violet: optimize to find empty spot faster
+            for (int i = 0; i < MAX_CHANNELS; i++)
+            {
+                if (channels[i] == nullptr) {
+                    channels[i] = channel;
+                    _activeChannels++;
+                    return true;
+                }
+            }
+
+            delete channel;
+            return false;
+        }
+
+
+        /**
+         * @brief Removes a channel from the manager.
+         *
+         * @param channel Channel to remove.
+         * @param destroy If true the channel will be deleted after removal.
+         * @return True if the channel was removed, false otherwise.
+         */
+        bool remove (Channel *channel, bool destroy = false)
+        {
+            if (channel == nullptr)
+                return false;
+
+            for (int i = 0; i < MAX_CHANNELS; i++)
+            {
+                if (channels[i] != channel)
+                    continue;
+
+                channels[i] = nullptr; 
+                _activeChannels--;
+
+                if (destroy)
+                    delete channel;
+
+                return true;
+            }
+
+            return false;
+        }
+
+
+        /**
+         * @brief Deletes all channels in the manager. If `invalidate` is set to `true` all sockets will be
+         * invalidated to avoid their shutdown.
+         *
+         * @return Manager*
+         */
+        Manager *reset (bool invalidate = false)
+        {
+            for (int i = 0; i < MAX_CHANNELS; i++)
+            {
+                if (channels[i] == nullptr)
+                    continue;
+
+                if (invalidate)
+                    channels[i]->socket->invalidate();
+
+                delete channels[i];
+                channels[i] = nullptr;
+                _activeChannels--;
+            }
+
+            return this;
+        }
+
+
+        /**
+         * @brief Manager's entry point.
+         *
+         * @param updateFunction Update function that will be called periodically.
+         * @param usecTimeout Timeout in microseconds (default is 250,000 µs for 250ms).
+         * @param nonPersistent If true the manager will terminate when there are no active channels.
+         */
+        void main (IUpdate *updateFunction = nullptr, int usecTimeout = 250000, bool nonPersistent = false)
+        {
+            int i, count, flags;
+            SOCKET hisock, socknum;
+            struct timeval timeout;
+            fd_set dsetr, dsetw;
+            Channel *channel;
+
+            currTime = asr::millis();
+            for (i = 0; i < MAX_CHANNELS; i++) {
+                if (channels[i] != nullptr)
+                    channels[i]->startTime = currTime;
+            }
+
+            while (!terminate)
+            {
+                currTime = asr::millis();
+
+                FD_ZERO(&dsetr);
+                FD_ZERO(&dsetw);
+
+                hisock = 0;
+                for (i = 0; i < MAX_CHANNELS; i++)
+                {
+                    if (channels[i] == nullptr)
+                        continue;
+
+                    socknum = channels[i]->socket->socket;
+                    if (socknum > hisock) hisock = socknum;
+
+                    FD_SET(socknum, &dsetr);
+                    if (channels[i]->socket->type == SOCK_STREAM)
+                        FD_SET(socknum, &dsetw);
+                }
+
+                if (hisock == 0) {
+                    if (nonPersistent) break;
+                    usleep(1e6);
+                }
+
+                if (updateFunction != nullptr)
+                    updateFunction->update(currTime);
+
+                timeout.tv_sec = 0;
+                timeout.tv_usec = usecTimeout;
+
+                count = ::select (hisock+1, &dsetr, &dsetw, nullptr, &timeout);
+                if (count < 0)
+                {
+                    for (i = 0; i < MAX_CHANNELS; i++)
+                    {
+                        if (channels[i] == nullptr || channels[i]->socket->alive())
+                            continue;
+
+                        channels[i]->disconnected();
+                        delete channels[i];
+                        channels[i] = nullptr;
+                        _activeChannels--;
+                        _totalChannels++;
+                    }
+
+                    continue;
+                }
+
+                for (i = 0; i < MAX_CHANNELS; i++)
+                {
+                    channel = channels[i];
+                    if (channel == nullptr)
+                        continue;
+
+                    if (channel->update(currTime) == false)
+                    {
+                        if (channels[i] != channel)
+                            continue;
+
+                        channel->disconnected();
+                        delete channel;
+                        channels[i] = nullptr;
+                        _activeChannels--;
+                        _totalChannels++;
+                        continue;
+                    }
+
+                    socknum = channel->socket->socket;
+                    flags = 0;
+
+                    if (FD_ISSET(socknum, &dsetw) || channel->socket->type == SOCK_DGRAM)
+                        flags |= WRITE_STATE;
+                    if (FD_ISSET(socknum, &dsetr))
+                        flags |= READ_STATE;
+
+                    if (channel->stateChanged(flags) == false)
+                    {
+                        if (channels[i] != channel)
+                            continue;
+
+                        if (channel->socket->persistent)
+                            continue;
+
+                        channel->disconnected();
+                        delete channel;
+                        channels[i] = nullptr;
+                        _activeChannels--;
+                        _totalChannels++;
+                    }
+                }
+            }
+
+            reset();
+        }
+    };
+
+    /**
+     * @brief Global default instance of the manager class.
+    */
+    extern Manager *manager;
+
+}};
+
+#endif

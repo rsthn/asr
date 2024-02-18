@@ -1,0 +1,533 @@
+#ifndef __ASR_UTILS_LIST_H
+#define __ASR_UTILS_LIST_H
+
+#include <asr/defs>
+#include <asr/utils/Iterator>
+#include <asr/utils/Null>
+#include <asr/utils/Comparator>
+#include <asr/utils/Destroyer>
+#include <asr/utils/Linkable>
+
+#include <cstdlib>
+
+namespace asr {
+namespace utils {
+
+	/**
+	**	Generic linked list. Wraps all items in Linkable<T> objects.
+	*/
+
+	template<typename T>
+	class List
+	{
+		protected:
+
+		/**
+		**	Pointer to the first item in the list.
+		*/
+		Linkable<T> *top;
+
+		/**
+		**	Pointer to the last item in the list.
+		*/
+		Linkable<T> *bottom;
+
+		/**
+		**	Count of items in the list.
+		*/
+		int count;
+
+		public:
+
+		/**
+		**	Constructor of the list.
+		*/
+		List() : top(nullptr), bottom(nullptr), count(0)
+		{
+		}
+
+		/**
+		**	Traverses the list and destroys all nodes and values. To preserve values call reset() first.
+		*/
+		virtual ~List()
+		{
+			clear();
+		}
+
+		/**
+		**	Iterator interface.
+		*/
+		using _Iterator = Iterator<List*, Linkable<T>*, T>;
+
+		_Iterator begin() { return _Iterator (this, this->top); }
+		_Iterator end() { return _Iterator (this, this->bottom); }
+
+		bool iteratorNotEquals (_Iterator *a, _Iterator *b) { return a->index != nullptr && a->index != b->index->next(); }
+		T& iteratorDereference (_Iterator *a) { return a->index->value; }
+		void iteratorIncrement (_Iterator *a) { a->index = a->index->next(); }
+
+		/**
+		**	Traverses the list and destroys all nodes and values. Destruction of values is performed only if type T is a pointer to object.
+		*/
+		List *clear()
+		{
+			Linkable<T> *item, *nextItem;
+
+			for (item = top; item != nullptr; item = nextItem)
+			{
+				nextItem = item->next();
+
+				Destroyer<T>::destroy(item->value);
+
+				delete item;
+			}
+
+			top = bottom = nullptr;
+			count = 0;
+
+			return this;
+		}
+
+		/**
+		**	Traverses the list and destroys all nodes. Values are preserved.
+		*/
+		List *reset()
+		{
+			Linkable<T> *item, *nextItem;
+
+			for (item = top; item != nullptr; item = nextItem)
+			{
+				nextItem = item->next();
+				delete item;
+			}
+
+			top = bottom = nullptr;
+			count = 0;
+
+			return this;
+		}
+
+		/**
+		**	Returns the length of the list.
+		*/
+		int length()
+		{
+			return this->count;
+		}
+
+		/**
+		**	Returns the head (top pointer) of the list.
+		*/
+		Linkable<T> *head()
+		{
+			return this->top;
+		}
+
+		/**
+		**	Returns the tail (bottom pointer) of the list.
+		*/
+		Linkable<T> *tail()
+		{
+			return this->bottom;
+		}
+
+		/**
+		**	Returns an item given its index.
+		*/
+		T getAt (int index)
+		{
+			Linkable<T> *item;
+
+			for (item = top; item && index--; item = item->next());
+
+			return item != nullptr ? item->value : Null<T>::get();
+		}
+
+		/**
+		**	Returns the first item in the list.
+		*/
+		T first()
+		{
+			return top != nullptr ? top->value : Null<T>::get();
+		}
+
+		/**
+		**	Returns the last item in the list.
+		*/
+		T last()
+		{
+			return bottom != nullptr ? bottom->value : Null<T>::get();
+		}
+
+		/**
+		**	Returns the node at the given index.
+		*/
+		Linkable<T> *getNodeAt (int index)
+		{
+			Linkable<T> *item;
+
+			for (item = top; item && index--; item = item->next());
+
+			return item;
+		}
+
+		/**
+		**	Returns an item given another element to compare.
+		*/
+		T get (T value)
+		{
+			Linkable<T> *item;
+
+			for (item = top; item; item = item->next())
+				if (!Comparator<T>::compare(item->value, value)) return item->value;
+
+			return Null<T>::get();
+		}
+
+		/**
+		**	Returns an item given a value to compare.
+		*/
+		template <typename K>
+		T get (K value)
+		{
+			Linkable<T> *item;
+
+			for (item = top; item; item = item->next())
+				if (!ComparatorB<T,K>::compare(item->value, value)) return item->value;
+
+			return Null<T>::get();
+		}
+
+		/**
+		**	Returns the node of an item given another element to compare.
+		*/
+		Linkable<T> *getNode (T value)
+		{
+			Linkable<T> *item;
+
+			for (item = top; item; item = item->next())
+				if (!Comparator<T>::compare(item->value, value)) return item;
+
+			return nullptr;
+		}
+
+		/**
+		**	Returns the node of an item given a value to compare.
+		*/
+		template <typename K>
+		Linkable<T> *getNode (K value)
+		{
+			Linkable<T> *item;
+
+			for (item = top; item; item = item->next())
+				if (!ComparatorB<T,K>::compare(item->value, value)) return item;
+
+			return nullptr;
+		}
+
+		/**
+		**	Returns the node of an item given another element to compare (scalar comparison).
+		*/
+		Linkable<T> *sgetNode (T value)
+		{
+			Linkable<T> *item;
+
+			for (item = top; item; item = item->next())
+				if (item->value == value) return item;
+
+			return nullptr;
+		}
+
+		/**
+		**	Returns a boolean indicating if the specified object is contained in the list.
+		*/
+		bool contains (T value)
+		{
+			Linkable<T> *item;
+
+			for (item = top; item; item = item->next())
+			{
+				if (!Comparator<T>::compare(item->value, value)) return true;
+			}
+
+			return false;
+		}
+
+		/**
+		**	Returns a boolean indicating if the specified value is contained in the list.
+		*/
+		template<typename K>
+		bool contains (K value)
+		{
+			Linkable<T> *item;
+
+			for (item = top; item; item = item->next())
+			{
+				if (!ComparatorB<T,K>::compare(item->value, value)) return true;
+			}
+
+			return false;
+		}
+
+		/**
+		**	Returns a boolean indicating if the specified object value is contained in the list (scalar comparison).
+		*/
+		bool scontains (T value)
+		{
+			Linkable<T> *item;
+
+			for (item = top; item; item = item->next())
+				if (item->value == value) return true;
+
+			return false;
+		}
+
+		/**
+		**	Removes the given item from the list and returns the item.
+		*/
+		T remove (Linkable<T> *item)
+		{
+			if (!item) return Null<T>::get();
+
+			if (!item->prev()) top = item->next();
+			if (!item->next()) bottom = item->prev();
+
+			count--;
+
+			T value = item->unlink()->value;
+			delete item;
+
+			return value;
+		}
+
+		/**
+		**	Adds an item before the given reference.
+		*/
+		List *insertBefore (Linkable<T> *ref, T value)
+		{
+			if (!ref) return this;
+
+			Linkable<T> *item = new Linkable<T> (value);
+
+			item->linkBefore (ref);
+
+			if (ref == top) top = item;
+			count++;
+
+			return this;
+		}
+
+		/**
+		**	Adds an item after the given reference.
+		*/
+		List *insertAfter (Linkable<T> *ref, T value)
+		{
+			if (!ref) return this;
+
+			Linkable<T> *item = new Linkable<T> (value);
+
+			item->linkAfter (ref);
+
+			if (ref == bottom) bottom = item;
+			count++;
+
+			return this;
+		}
+
+		/**
+		**	Adds an item to the top of the list.
+		*/
+		List *unshift (T value)
+		{
+			Linkable<T> *item = new Linkable<T> (value);
+
+			item->linkBefore (top);
+			if (!bottom) bottom = item;
+
+			top = item;
+			count++;
+
+			return this;
+		}
+
+		/**
+		**	Removes an item from the top of the list.
+		*/
+		T shift()
+		{
+			Linkable<T> *item = top;
+			if (!item) return Null<T>::get();
+
+			if (!(top = item->next())) bottom = nullptr;
+			count--;
+
+			T value = item->unlink()->value;
+			delete item;
+
+			return value;
+		}
+
+		/**
+		**	Adds an item to the bottom of the list.
+		*/
+		List *push (T value)
+		{
+			Linkable<T> *item = new Linkable<T> (value);
+
+			item->linkAfter (bottom);
+			if (!top) top = item;
+
+			bottom = item;
+			count++;
+
+			return this;
+		}
+
+		/**
+		**	Removes an item from the bottom of the list.
+		*/
+		T pop()
+		{
+			Linkable<T> *item = bottom;
+			if (!item) return Null<T>::get();
+
+			if (!(bottom = item->prev())) top = nullptr;
+			count--;
+
+			T value = item->unlink()->value;
+			delete item;
+
+			return value;
+		}
+
+		/**
+		**	Compares both lists and returns true if they match, must have same order. (equals() comparison).
+		*/
+		bool equals (List *list)
+		{
+			if (list->count != this->count)
+				return false;
+
+			for (Linkable<T> *i = this->top, *j = list->top; i && j; i = i->next(), j = j->next())
+			{
+				if (Comparator<T>::compare(i->value, j->value))
+					return false;
+			}
+
+			return true;
+		}
+
+		/**
+		**	Compares both lists and returns true if they are the same, elements can be in different order. (equals() comparison).
+		*/
+		bool equalContents (List *list)
+		{
+			if (list->count != this->count)
+				return false;
+
+			for (Linkable<T> *i = this->top; i; i = i->next())
+			{
+				if (!list->contains (i->value))
+					return false;
+			}
+
+			return true;
+		}
+
+		/**
+		**	Appends all contents of a given list to this one.
+		*/
+		List *append (List *list)
+		{
+			for (Linkable<T> *i = list->top; i; i = i->next())
+				this->push (i->value);
+
+			return this;
+		}
+
+		/**
+		**	Returns an array with all the items in the list.
+		*/
+		T* toArray()
+		{
+			T *array = (T *)asr::alloc(sizeof(T) * count);
+
+			auto j = top;
+
+			for (int i = 0; i < count && j; i++, j = j->next())
+			{
+				array[i] = j->value;
+			}
+
+			return array;
+		}
+
+		/**
+		**	Sorts the list using the specified comparison function.
+		*/
+		void sort (int (*cmp) (T *a, T *b))
+		{
+			T *tmp, *array;
+
+			array = tmp = toArray();
+
+			std::qsort (array, count, sizeof(T), (int(*)(const void *, const void *))cmp);
+
+			for (auto i = top; i; i = i->next())
+				i->value = *tmp++;
+
+			delete array;
+		}
+
+		/**
+		**	Sorts the list using the default comparator function.
+		*/
+		void sort()
+		{
+			T *tmp, *array;
+
+			array = tmp = toArray();
+
+			std::qsort (array, count, sizeof(T), (int(*)(const void *, const void *))Comparator<T*>::compare);
+
+			for (auto i = top; i; i = i->next())
+				i->value = *tmp++;
+
+			delete array;
+		}
+
+		/**
+		**	Traverses the list and invokes the given handler function. If the handler returns false traversing will be stopped immediately. There
+		**	are different overloads of this method to provide more or less parameters to the handler.
+		*/
+		void forEach (void (*fn) (T value))
+		{
+			Linkable<T> *i, *j;
+
+			for (i = top; i; i = j) {
+				j = i->next(); fn(i->value);
+			}
+		}
+
+		void forEach (bool (*fn) (T value))
+		{
+			Linkable<T> *i, *j;
+
+			for (i = top; i; i = j) {
+				j = i->next(); if (false == fn(i->value)) break;
+			}
+		}
+
+		void forEach (bool (*fn) (T value, Linkable<T> *node, List<T> *list))
+		{
+			Linkable<T> *i, *j;
+
+			for (i = top; i; i = j) {
+				j = i->next(); if (false == fn(i->value, i, this)) break;
+			}
+		}
+	};
+
+}};
+
+#endif

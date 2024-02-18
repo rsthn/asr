@@ -1,0 +1,215 @@
+#ifndef __ASR_UTILS_ARRAY_H
+#define __ASR_UTILS_ARRAY_H
+
+#include <asr/utils/Comparator>
+#include <asr/utils/Destroyer>
+#include <asr/utils/Linkable>
+#include <asr/utils/Iterator>
+#include <asr/utils/Null>
+#include <asr/defs>
+
+#include <cstdlib>
+
+namespace asr {
+namespace utils {
+
+	/**
+	**	Generic static array.
+	*/
+
+	template<typename T>
+	class Array
+	{
+		public:
+
+		/**
+		**	Pointer to the actual array containing the items.
+		*/
+		T *array;
+
+		/**
+		**	Length of the array.
+		*/
+		int length;
+
+		/**
+		**	Constructs an empty array of the specified size.
+		*/
+		Array (int length)
+		{
+			this->length = length;
+			this->array = (T*)asr::alloc(length*sizeof(T*));
+			this->reset();
+		}
+
+		/**
+		**	Traverses the array and destroys all values. To preserve values call reset() first.
+		*/
+		virtual ~Array()
+		{
+			clear();
+			asr::dealloc(array);
+		}
+
+		/**
+		**	Iterator interface.
+		*/
+		using _Iterator = Iterator<Array*, int, T>;
+
+		_Iterator begin() { return _Iterator (this, 0); }
+		_Iterator end() { return _Iterator (this, length); }
+
+		bool iteratorNotEquals (_Iterator *a, _Iterator *b) { return a->index < b->index; }
+		T& iteratorDereference (_Iterator *a) { return array[a->index]; }
+		void iteratorIncrement (_Iterator *a) { a->index++; }
+
+		/**
+		**	Traverses the array and destroys all values. Destruction of values is performed only if type T is a pointer to object.
+		*/
+		Array *clear()
+		{
+			for (int i = 0; i < length; i++)
+			{
+				Destroyer<T>::destroy(array[i]);
+				array[i] = Null<T>::get();
+			}
+
+			return this;
+		}
+
+		/**
+		**	Traverses the array and nullifies all slots. Values are preserved.
+		*/
+		Array *reset()
+		{
+			for (int i = 0; i < length; i++)
+				array[i] = Null<T>::get();
+
+			return this;
+		}
+
+		/**
+		**	Returns an item given its index.
+		*/
+		T get (int index)
+		{
+			return index < 0 || index >= length ? Null<T>::get() : array[index];
+		}
+
+		/**
+		**	Sets an item at the specified index.
+		*/
+		Array *set (int index, T value, bool _delete=true)
+		{
+			if (index >= 0 && index < length)
+			{
+				if (_delete && value != array[index])
+					Destroyer<T>::destroy(array[index]);
+
+				array[index] = value;
+			}
+
+			return this;
+		}
+
+		/**
+		**	Returns the index of an item (identical comparison). Returns -1 if not found.
+		*/
+		int indexOf (T value)
+		{
+			for (int i = 0; i < length; i++)
+			{
+				if (array[i] == value)
+					return i;
+			}
+
+			return -1;
+		}
+
+		/**
+		**	Returns the index of an item (uses ComparatorB). Returns -1 if not found.
+		*/
+		template <typename K>
+		int indexOf (K value)
+		{
+			for (int i = 0; i < length; i++)
+			{
+				if (!ComparatorB<T,K>::compare(array[i], value))
+					return i;
+			}
+
+			return -1;
+		}
+
+		/**
+		**	Returns an item given a value to compare (uses ComparatorB).
+		*/
+		template <typename K>
+		T find (K value)
+		{
+			for (int i = 0; i < length; i++)
+			{
+				if (!ComparatorB<T,K>::compare(array[i], value))
+					return array[i];
+			}
+
+			return Null<T>::get();
+		}
+
+		/**
+		**	Returns a boolean indicating if the specified value is contained in the array.
+		*/
+		template<typename K>
+		bool contains (K value)
+		{
+			for (int i = 0; i < length; i++)
+			{
+				if (!ComparatorB<T,K>::compare(array[i], value))
+					return true;
+			}
+
+			return false;
+		}
+
+		/**
+		**	Sorts the array using the specified comparison function.
+		*/
+		void sort (int (*cmp) (T *a, T *b))
+		{
+			std::qsort (array, length, sizeof(T), (int(*)(const void *, const void *))cmp);
+		}
+
+		/**
+		**	Sorts the array using the default comparator function.
+		*/
+		void sort()
+		{
+			std::qsort (array, length, sizeof(T), (int(*)(const void *, const void *))Comparator<T*>::compare);
+		}
+
+		/**
+		**	Traverses the array and invokes the given handler function. If the handler returns false traversing will be stopped immediately. There
+		**	are different overloads of this method to provide more or less parameters to the handler.
+		*/
+		void forEach (void (*fn) (T value))
+		{
+			for (int i = 0; i < length; i++)
+				fn(array[i]);
+		}
+
+		void forEach (bool (*fn) (T value))
+		{
+			for (int i = 0; i < length; i++)
+				if (fn(array[i]) == false) break;
+		}
+
+		void forEach (bool (*fn) (T value, int index, Array<T> *array))
+		{
+			for (int i = 0; i < length; i++)
+				if (fn(array[i], i, this) == false) break;
+		}
+	};
+
+}};
+
+#endif

@@ -1,0 +1,670 @@
+#ifndef __ASR_UTILS_LLIST_H
+#define __ASR_UTILS_LLIST_H
+
+#include <asr/utils/Comparator>
+#include <asr/utils/Destroyer>
+#include <asr/utils/Linkable>
+#include <asr/utils/Hash>
+#include <asr/utils/Iterator>
+
+namespace asr {
+namespace utils {
+
+    /* Forward declaration. */
+    template <class T> class _Level;
+
+    /**
+    **	Linkable element with two links, one for the list chain and one for the level chain.
+    */
+    template<typename T>
+    class _LLinkable : public Linkable<T>
+    {
+        public:
+
+        /**
+        **	Parent level.
+        */
+        _Level<_LLinkable*> *parent;
+
+        /**
+        **	Link for the second chain.
+        */
+        Linkable<_LLinkable*> link;
+
+        /**
+        **	Index of this element within the first chain.
+        */
+        int index;
+
+        /**
+        **	Constructs a linkable item with the specified value and index. Must be linked to other linkables manually.
+        */
+        _LLinkable (_Level<_LLinkable*> *parent, T value, int index) : Linkable<T> (value)
+        {
+            this->parent = parent;
+            this->link.value = this;
+            this->index = index;
+        }
+    };
+
+    /**
+    **	Descriptor of a hash-level.
+    */
+    template <typename T>
+    class _Level
+    {
+        public:
+
+        /**
+        **	Links to all sub-levels.
+        */
+        _Level<T> **subLevels;
+
+        /**
+        **	Links to the first and last value-items in this level.
+        */
+        Linkable<T> *top, *bottom;
+
+        /**
+        **	Number of sub-levels in the level.
+        */
+        int size;
+
+        /**
+        **	Number of value-items in the level.
+        */
+        int count;
+
+        /**
+        **	Constructs an empty level and allocates space for "n" sub-levels. If n is zero no sub-level array will be available.
+        */
+        _Level (int n)
+        {
+            this->subLevels = nullptr;
+            this->size = n;
+            this->count = 0;
+            this->top = this->bottom = nullptr;
+
+            if (n > 0) {
+                this->subLevels = new _Level<T>* [n];
+                for (int i = 0; i < n; i++)
+                    this->subLevels[i] = nullptr;
+            }
+        }
+
+        /**
+        **	Destroys the level and sub-levels.
+        */
+        ~_Level()
+        {
+            if (size > 0)
+            {
+                for (int i = 0; i < size; i++)
+                    if (this->subLevels[i] != nullptr) delete this->subLevels[i];
+
+                delete this->subLevels;
+            }
+        }
+    };
+
+    /**
+    **	Generic linked list with multi-level support for fast search operations (L-List). Wraps all items in Linkable<T> objects.
+    */
+
+    template<typename T>
+    class LList
+    {
+        protected:
+
+        /**
+        **	Link to the first level.
+        */
+        _Level<_LLinkable<T>*> *level;
+
+        /**
+        **	Maximum depth (calculated based on the bits-per-index parameter).
+        */
+        int maxDepth;
+
+        /**
+        **	Number of bits per index value.
+        */
+        int bitsPerIndex;
+
+        /**
+        **	Mask to obtain the level index (calculated as (2^bits)-1).
+        */
+        uint32_t indexMask;
+
+        /**
+        **	Pointer to the first item in the list.
+        */
+        Linkable<T> *top;
+
+        /**
+        **	Pointer to the last item in the list.
+        */
+        Linkable<T> *bottom;
+
+        /**
+        **	Count of items in the list.
+        */
+        int count;
+
+        /**
+        **	Number of bucket-levels in the directory.
+        */
+        int numBuckets;
+
+        /**
+        **	Maximum detected number of items per-bucket (fill-level).
+        */
+        int maxFill;
+
+        public:
+
+        /**
+        **	Constructs the LList with the specified bits-per-index (default is 5).
+        */
+        LList (int bitsPerIndex=5)
+        {
+            top = bottom = nullptr;
+            level = nullptr;
+
+            count = 0;
+            numBuckets = 0;
+            maxFill = 0;
+
+            if (bitsPerIndex < 0) bitsPerIndex = 1;
+            if (bitsPerIndex > 16) bitsPerIndex = 16;
+
+            this->bitsPerIndex = bitsPerIndex;
+            this->indexMask = (1 << bitsPerIndex) - 1;
+            this->maxDepth = (32 + bitsPerIndex - 1) / bitsPerIndex;
+        }
+
+        /**
+        **	Traverses the hash table and destroys all nodes and values. To preserve values call reset() first.
+        */
+        virtual ~LList() {
+            clear();
+        }
+
+        /**
+        **	Iterator interface.
+        */
+        using _Iterator = Iterator<LList*, Linkable<T>*, T>;
+
+        _Iterator begin() { return _Iterator (this, this->top); }
+        _Iterator end() { return _Iterator (this, this->bottom); }
+
+        bool iteratorNotEquals (_Iterator *a, _Iterator *b) { return a->index != nullptr && a->index != b->index->next(); }
+        T& iteratorDereference (_Iterator *a) { return a->index->value; }
+        void iteratorIncrement (_Iterator *a) { a->index = a->index->next(); }
+
+        /**
+        **	Finds the data bucket for the specified hash.
+        */
+        protected: _Level<_LLinkable<T>*> *findBucket (uint32_t hash, bool create=false)
+        {
+            _Level<_LLinkable<T>*> *cur = this->level;
+            _Level<_LLinkable<T>*> *parent = nullptr;
+            int k, lk;
+
+            for (int i = maxDepth; i; i--)
+            {
+                k = hash & indexMask;
+                hash >>= bitsPerIndex;
+
+                if (cur == nullptr)
+                {
+                    if (!create) return nullptr;
+
+                    cur = new _Level<_LLinkable<T>*> (i == 1 ? 0 : indexMask+1);
+
+                    if (i == 1)
+                        numBuckets++;
+
+                    if (parent == nullptr)
+                        this->level = cur;
+                    else
+                        parent->subLevels[lk] = cur;
+                }
+
+                parent = cur;
+
+                if (i != 1)
+                    cur = cur->subLevels[lk = k];
+            }
+
+            return parent;
+        }
+
+        /**
+        **	Traverses the table and destroys all nodes and values. Destruction of values is performed only if type T is a pointer to object.
+        */
+        public: LList<T> *clear()
+        {
+            Linkable<T> *item, *nextItem;
+
+            delete this->level;
+
+            for (item = top; item != nullptr; item = nextItem)
+            {
+                nextItem = item->next();
+
+                Destroyer<T>::destroy(item->value);
+
+                delete item;
+            }
+
+            this->top = this->bottom = nullptr;
+            this->level = nullptr;
+
+            this->numBuckets = this->maxFill = this->count = 0;
+            return this;
+        }
+
+        /**
+        **	Traverses the table and destroys all nodes. Values are preserved.
+        */
+        LList<T> *reset()
+        {
+            Linkable<T> *item, *nextItem;
+            delete this->level;
+
+            for (item = top; item != nullptr; item = nextItem) {
+                nextItem = item->next();
+                delete item;
+            }
+
+            this->top = this->bottom = nullptr;
+            this->level = nullptr;
+
+            this->numBuckets = this->maxFill = this->count = 0;
+            return this;
+        }
+
+        /**
+        **	Returns the length of the list.
+        */
+        int length()
+        {
+            return this->count;
+        }
+
+        /**
+        **	Returns the head (top pointer) of the list.
+        */
+        Linkable<T> *head() {
+            return this->top;
+        }
+
+        /**
+        **	Returns the tail (bottom pointer) of the list.
+        */
+        Linkable<T> *tail() {
+            return this->bottom;
+        }
+
+        /**
+        **	Returns the number of bucket-levels in the directory.
+        */
+        int getNumBuckets() {
+            return numBuckets;
+        }
+
+        /**
+        **	Returns the maximum detected number of items per-bucket (fill-level).
+        */
+        int getMaxFill() {
+            return maxFill;
+        }
+
+        /**
+        **	Returns an item given its index.
+        */
+        T getAt (int index) {
+            Linkable<T> *item;
+            for (item = top; item && index--; item = item->next());
+            return item != nullptr ? item->value : nullptr;
+        }
+
+        /**
+        **	Returns the node at the given index.
+        */
+        Linkable<T> *getNodeAt (int index) {
+            Linkable<T> *item;
+            for (item = top; item && index--; item = item->next());
+            return item;
+        }
+
+        /**
+        **	Returns an item given another element to compare.
+        */
+        T get (T value, uint32_t hash=0)
+        {
+            _Level<_LLinkable<T>*> *list = findBucket(hash == 0 ? Hash<T>::get(value) : hash);
+            if (list == nullptr) return nullptr;
+
+            Linkable<_LLinkable<T>*> *item;
+
+            for (item = list->top; item; item = item->next())
+                if (!Comparator<T>::compare(item->value->value, value)) return item->value->value;
+
+            return nullptr;
+        }
+
+        /**
+        **	Returns an item given a value to compare.
+        */
+        template <typename K>
+        T get (K value, uint32_t hash=0)
+        {
+            _Level<_LLinkable<T>*> *list = findBucket(hash == 0 ? Hash<K>::get(value) : hash);
+            if (list == nullptr) return nullptr;
+
+            Linkable<_LLinkable<T>*> *item;
+
+            for (item = list->top; item; item = item->next())
+                if (!ComparatorB<T,K>::compare(item->value->value, value)) return item->value->value;
+
+            return nullptr;
+        }
+
+        /**
+        **	Returns the index of an item given another element to compare.
+        */
+        int indexOf (T value, uint32_t hash=0)
+        {
+            _Level<_LLinkable<T>*> *list = findBucket(hash == 0 ? Hash<T>::get(value) : hash);
+            if (list == nullptr) return -1;
+
+            Linkable<_LLinkable<T>*> *item;
+
+            for (item = list->top; item; item = item->next())
+                if (!Comparator<T>::compare(item->value->value, value)) return item->value->index;
+
+            return -1;
+        }
+
+        /**
+        **	Returns an item given a value to compare.
+        */
+        template <typename K>
+        int indexOf (K value, uint32_t hash=0)
+        {
+            _Level<_LLinkable<T>*> *list = findBucket(hash == 0 ? Hash<K>::get(value) : hash);
+            if (list == nullptr) return -1;
+
+            Linkable<_LLinkable<T>*> *item;
+
+            for (item = list->top; item; item = item->next())
+                if (!ComparatorB<T,K>::compare(item->value->value, value)) return item->value->index;
+
+            return -1;
+        }
+
+        /**
+        **	Returns the node of an item given another element to compare.
+        */
+        Linkable<T> *getNode (T value, uint32_t hash=0)
+        {
+            _Level<_LLinkable<T>*> *list = findBucket(hash == 0 ? Hash<T>::get(value) : hash);
+            if (list == nullptr) return nullptr;
+
+            Linkable<_LLinkable<T>*> *item;
+
+            for (item = list->top; item; item = item->next())
+                if (!Comparator<T>::compare(item->value->value, value)) return item->value;
+
+            return nullptr;
+        }
+
+        /**
+        **	Returns the node of an item given a value to compare.
+        */
+        template <typename K>
+        Linkable<T> *getNode (K value, uint32_t hash=0)
+        {
+            _Level<_LLinkable<T>*> *list = findBucket(hash == 0 ? Hash<K>::get(value) : hash);
+            if (list == nullptr) return nullptr;
+
+            Linkable<_LLinkable<T>*> *item;
+
+            for (item = list->top; item; item = item->next())
+                if (!ComparatorB<T,K>::compare(item->value->value, value)) return item->value;
+
+            return nullptr;
+        }
+
+        /**
+        **	Returns the node of an item given another element to compare (scalar comparison).
+        */
+        Linkable<T> *sgetNode (T value, uint32_t hash=0)
+        {
+            _Level<_LLinkable<T>*> *list = findBucket (hash == 0 ? Hash<T>::get(value) : hash);
+            if (list == nullptr) return nullptr;
+
+            Linkable<_LLinkable<T>*> *item;
+
+            for (item = list->top; item; item = item->next())
+                if (item->value->value == value) return item->value;
+
+            return nullptr;
+        }
+
+        /**
+        **	Returns a boolean indicating if the specified object is contained in the table.
+        */
+        bool contains (T value, uint32_t hash=0)
+        {
+            _Level<_LLinkable<T>*> *list = findBucket (hash == 0 ? Hash<T>::get(value) : hash);
+            if (list == nullptr) return false;
+
+            Linkable<_LLinkable<T>*> *item;
+
+            for (item = list->top; item; item = item->next())
+                if (!Comparator<T>::compare(item->value->value, value)) return true;
+
+            return false;
+        }
+
+        /**
+        **	Returns an integer with the amount of values found with the specified hash.
+        */
+        int contains (uint32_t value)
+        {
+            _Level<_LLinkable<T>*> *list = findBucket(value);
+            if (list == nullptr) return 0;
+
+            return list->count;
+        }
+
+        /**
+        **	Returns a boolean indicating if the specified value is contained in the table.
+        */
+        template<typename K>
+        bool contains (K value, uint32_t hash=0)
+        {
+            _Level<_LLinkable<T>*> *list = findBucket (hash == 0 ? Hash<K>::get(value) : hash);
+            if (list == nullptr) return false;
+
+            Linkable<_LLinkable<T>*> *item;
+
+            for (item = list->top; item; item = item->next())
+                if (!ComparatorB<T,K>::compare(item->value->value, value)) return true;
+
+            return false;
+        }
+
+        /**
+        **	Returns a boolean indicating if the specified object value is contained in the list (scalar comparison).
+        */
+        bool scontains (T value, uint32_t hash=0)
+        {
+            _Level<_LLinkable<T>*> *list = findBucket (hash == 0 ? Hash<T>::get(value) : hash);
+            if (list == nullptr) return false;
+
+            Linkable<_LLinkable<T>*> *item;
+
+            for (item = list->top; item; item = item->next())
+                if (item->value->value == value) return true;
+
+            return false;
+        }
+
+        /**
+        **	Removes the given item from the list and returns the item.
+        */
+        T remove (Linkable<T> *item)
+        {
+            _LLinkable<T> *node = (_LLinkable<T>*)item;
+            if (!node) return nullptr;
+
+            if (this->top == node) top = node->next();
+            if (this->bottom == node) bottom = node->prev();
+
+            if (node->parent->top == &node->link) node->parent->top = node->link.next();
+            if (node->parent->bottom == &node->link) node->parent->bottom = node->link.prev();
+
+            for (Linkable<T> *i = node->next(); i; i = i->next())
+                ((_LLinkable<T>*)i)->index--;
+
+            node->parent->count--;
+            this->count--;
+
+            node->unlink();
+            node->link.unlink();
+
+            T value = node->value;
+            delete node;
+
+            return value;
+        }
+
+        /**
+        **	Adds an item before the given reference.
+        */
+        LList<T> *insertBefore (Linkable<T> *ref, T value)
+        {
+            _Level<_LLinkable<T>*> *list = findBucket (Hash<T>::get(value), true);
+
+            _LLinkable<T> *node = new _LLinkable<T> (list, value, ((_LLinkable<T>*)ref)->index);
+
+            node->link.linkAfter(list->bottom);
+            if (list->bottom == nullptr) list->top = &node->link;
+            list->bottom = &node->link;
+
+            node->linkBefore (ref);
+            if (ref == this->top) this->top = node;
+
+            for (Linkable<T> *i = node->next(); i; i = i->next())
+                ((_LLinkable<T>*)i)->index++;
+
+            if (++list->count > this->maxFill) this->maxFill = list->count;
+            this->count++;
+            return this;
+        }
+
+        /**
+        **	Adds an item after the given reference.
+        */
+        LList<T> *insertAfter (Linkable<T> *ref, T value)
+        {
+            _Level<_LLinkable<T>*> *list = findBucket (Hash<T>::get(value), true);
+
+            _LLinkable<T> *node = new _LLinkable<T> (list, value, 1 + ((_LLinkable<T>*)ref)->index);
+
+            node->link.linkAfter(list->bottom);
+            if (list->bottom == nullptr) list->top = &node->link;
+            list->bottom = &node->link;
+
+            node->linkAfter (ref);
+            if (ref == this->bottom) this->bottom = node;
+
+            for (Linkable<T> *i = node->next(); i; i = i->next())
+                ((_LLinkable<T>*)i)->index++;
+
+            if (++list->count > this->maxFill) this->maxFill = list->count;
+            this->count++;
+            return this;
+        }
+
+        /**
+        **	Adds an item to the top of the list.
+        */
+        LList<T> *unshift (T value)
+        {
+            _Level<_LLinkable<T>*> *list = findBucket (Hash<T>::get(value), true);
+
+            _LLinkable<T> *node = new _LLinkable<T> (list, value, 0);
+
+            node->link.linkAfter(list->bottom);
+            if (list->bottom == nullptr) list->top = &node->link;
+            list->bottom = &node->link;
+
+            node->linkBefore(this->top);
+            if (this->bottom == nullptr) this->bottom = node;
+            this->top = node;
+
+            for (Linkable<T> *i = node->next(); i; i = i->next())
+                ((_LLinkable<T>*)i)->index++;
+
+            if (++list->count > this->maxFill) this->maxFill = list->count;
+            this->count++;
+            return this;
+        }
+
+        /**
+        **	Removes an item from the top of the list.
+        */
+        T shift() {
+            return remove(this->top);
+        }
+
+        /**
+        **	Adds an item to the bottom of the list.
+        */
+        LList<T> *push (T value)
+        {
+            _Level<_LLinkable<T>*> *list = findBucket (Hash<T>::get(value), true);
+
+            _LLinkable<T> *node = new _LLinkable<T> (list, value, this->count);
+
+            node->link.linkAfter(list->bottom);
+            if (list->bottom == nullptr) list->top = &node->link;
+            list->bottom = &node->link;
+
+            node->linkAfter(this->bottom);
+            if (this->bottom == nullptr) this->top = node;
+            this->bottom = node;
+
+            if (++list->count > this->maxFill) this->maxFill = list->count;
+            this->count++;
+
+            return this;
+        }
+
+        /**
+        **	Removes an item from the bottom of the list.
+        */
+        T pop() {
+            return remove(this->bottom);
+        }
+
+        /**
+        **	Appends all contents of a given table to this one.
+        */
+        LList<T> *append (LList<T> *list)
+        {
+            for (Linkable<T> *i = list->top; i; i = i->next())
+                this->push (i->value);
+
+            return this;
+        }
+    };
+
+}};
+
+#endif

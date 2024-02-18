@@ -1,0 +1,79 @@
+/*
+**	asr/errors/Error
+*/
+
+#ifndef __ASR_ERRORS_ERROR_H
+#define __ASR_ERRORS_ERROR_H
+
+#include <asr/utils/String>
+
+namespace asr {
+namespace errors {
+
+    using asr::utils::String;
+
+    /**
+     * @brief Describes an error.
+     */
+    class Error
+    {
+        protected:
+
+        /**
+         * @brief Error message.
+         */
+        const char *_message;
+        String *_string;
+
+        /**
+         * @brief Error code.
+         */
+        int _code;
+
+        public:
+
+        /**
+         * @brief Creates an error with the specified message and (optional) error code.
+         */
+        Error (const char *message, int code=0) : _message(message), _string(nullptr), _code(code)
+        { }
+
+        /**
+         * @brief Creates an error from a String object. The provided string will be deleted by the destructor.
+         */
+        Error (String *string, int code=0) : _message(nullptr), _string(string), _code(code)
+        { }
+
+        /**
+         * @brief Error only with an error code.
+         */
+        Error (int code) : _message(nullptr), _string(nullptr), _code(code)
+        { }
+
+        /**
+         */
+        virtual ~Error() {
+            if (_string != nullptr)
+                delete _string;
+        }
+
+        /**
+         * @brief Returns the error message.
+         * @return const char* 
+         */
+        virtual const char *message() const {
+            return _string != nullptr ? _string->c_str() : _message;
+        }
+
+        /**
+         * @brief Returns the error code.
+         * @return int 
+         */
+        virtual int code() const {
+            return _code;
+        }
+    };
+
+}};
+
+#endif

@@ -1,0 +1,264 @@
+#ifndef __ASR_NET_CHANNEL_H
+#define __ASR_NET_CHANNEL_H
+
+#include <asr/net/InAddr>
+#include <asr/net/Socket>
+#include <asr/net/Handler>
+#include <asr/io/Stream>
+#include <asr/errors/Error>
+
+#define READ_STATE		0x01
+#define	WRITE_STATE		0x02
+
+namespace asr {
+namespace net {
+
+    using asr::io::Stream;
+    using asr::errors::Error;
+
+    /**
+     * @brief Provides functionality to make use of cache on socket stream, and to interpret data by making use of an handler.
+     */
+
+    class Channel
+    {
+        private:
+
+        /**
+         * @brief Count of created channels (for identification purposes).
+         */
+        static int numChannels;
+
+        /**
+         * @brief Everytime a socket read operation is made the inputIds are incremented. These are used to avoid `onDataAvailable`
+         * calls with the same unmodified input data.
+         */
+        int inputCounter1, inputCounter2;
+
+        /**
+         * @brief Maximum buffer size.
+         */
+        static const int bufferSize = 1024;
+
+        /**
+         * @brief Buffer for intermediate I/O operations.
+         */
+        char *buffer;
+
+        public:
+
+        /**
+         * @brief Identification number of the channel.
+         */
+        int id;
+
+        /**
+         * @brief Time when the channel was created (set by Manager).
+         */
+        time_t startTime;
+
+        /**
+         * @brief Socket object related to the channel.
+         */
+        Socket *socket;
+
+        /**
+         * @brief Data stream.
+         */
+        Stream *stream;
+
+        /**
+         * @brief The handler of the channel's data.
+         */
+        Handler *handler;
+
+
+        /**
+         * @brief Returns a new channel identification number.
+         * @return int 
+         */
+        static int allocId() {
+            return ++Channel::numChannels;
+        }
+
+
+        /**
+         * @brief Constructs the channel with the provided socket, handler and stream which will belong to the channel
+         * and will be destroyed when necessary.
+         * 
+         * @param socket Socket object for communication.
+         * @param handler Channel handler.
+         * @param stream Data stream to be used by the channel.
+         */
+        Channel (Socket *socket, Handler *handler = nullptr, Stream *stream = nullptr)
+        {
+            this->buffer = (char *)asr::alloc(Channel::bufferSize);
+            this->handler = nullptr;
+            this->socket = socket;
+            this->stream = stream;
+            setHandler(handler);
+
+            this->id = Channel::allocId();
+            this->inputCounter1 = this->inputCounter2 = 0;
+        }
+
+
+        /**
+         * @brief Destroys the handler, stream and socket.
+         */
+        virtual ~Channel()
+        {
+            asr::dealloc(buffer);
+
+            if (handler != nullptr) {
+                delete handler;
+                handler = nullptr;
+            }
+
+            if (stream != nullptr) {
+                delete stream;
+                stream = nullptr;
+            }
+
+            if (socket != nullptr) {
+                delete socket;
+                socket = nullptr;
+            }
+        }
+
+        /**
+         * @brief Sets the channel handler.
+         * 
+         * @param handler Handler to be set.
+         * @param isConnected When `true` the `onConnected` method of the handler will be called.
+         */
+        void setHandler (Handler *handler, bool isConnected=false)
+        {
+            if (this->handler != nullptr)
+                delete this->handler;
+
+            this->handler = handler;
+            if (this->handler != nullptr) {
+                this->handler->channel = this;
+                if (isConnected)
+                    this->handler->connected();
+            }
+        }
+
+
+        /**
+         * @brief Executed when the channel's I/O state has changed. Data from the socket will be stored in the stream, and the data
+         * from the stream's output will be written to be socket depending if the READ or WRITE state is available.
+         * 
+         * @param flags A combination of READ_STATE and WRITE_STATE flags.
+         * @return bool
+         */
+        virtual bool stateChanged (int flags)
+        {
+            bool callHandler = false;
+            bool returnValue = true;
+            bool shouldShutdown = false;
+
+            // If the socket has data and the channel is ready, read into the stream.
+            if (flags & READ_STATE)
+            {
+                if (stream != nullptr)
+                {
+                    int numBytes = socket->read(buffer, Channel::bufferSize, stream->input->spaceAvailable());
+                    if (numBytes == 0) {
+                        shouldShutdown = true;
+                        flags |= WRITE_STATE;
+                        goto checkWriteState;
+                    }
+
+                    if (stream->input->fill(buffer, numBytes) != numBytes)
+                        return false;
+                }
+
+                callHandler = true;
+                inputCounter1++;
+            }
+
+            // If data is available call the handler.
+            if (handler != nullptr && (callHandler || (stream != nullptr && stream->input->bytesAvailable())))
+            {
+                if (inputCounter1 != inputCounter2) {
+                    returnValue = handler->dataAvailable(stream ? stream->input : nullptr, stream ? stream->output : nullptr);
+                    inputCounter2 = inputCounter1;
+                }
+            }
+
+        checkWriteState:
+            if ((flags & WRITE_STATE) && stream != nullptr) {
+                if (flush() < 0 || shouldShutdown)
+                    return false;
+            }
+
+            return returnValue;
+        }
+
+
+        /**
+         * @brief Flushes the stream's output contents to the socket.
+         * @return Amount of bytes written or a negative value on errors.
+         */
+        int flush()
+        {
+            if (stream == nullptr || socket == nullptr)
+                return 0;
+
+            int totalBytes = 0;
+            while (true)
+            {
+                int numBytes = stream->output->bytesAvailable();
+                if (!numBytes) break;
+
+                if (numBytes > Channel::bufferSize)
+                    numBytes = Channel::bufferSize;
+
+                stream->output->drain(buffer, numBytes, false);
+
+                int bytesWritten = socket->write(buffer, numBytes);
+                if (!bytesWritten) break;
+
+                stream->output->drain(nullptr, bytesWritten, true);
+                totalBytes += bytesWritten;
+            }
+
+            return totalBytes;
+        }
+
+        /**
+         * @brief Performs actions when the channel data needs to be updated.
+         * @return Return `false` to close the connection immediately.
+         */
+        virtual bool update (time_t time)
+        {
+            if (handler != nullptr)
+                return handler->update(time - startTime, stream ? stream->output : nullptr);
+            else
+                return true;
+        }
+
+        /**
+         * @brief Executed when the channel's I/O state has been closed.
+         */
+        virtual void disconnected()
+        {
+            if (handler != nullptr)
+                handler->disconnected();
+        }
+
+        /**
+         * @brief Connects to a server and returns a new channel.
+         * @param handler Handler to be used by the channel.
+         * @param address Address of the server.
+         * @param port Port number of the server.
+         * @return Channel*
+         */
+        static Channel *connect (Handler *handler, const char *address, int port);
+    };
+
+}};
+
+#endif

@@ -1,0 +1,25 @@
+/*
+**	asr/crypto/CRC32.h
+*/
+
+#ifndef __ASR_CRYPTO_CRC32_H
+#define __ASR_CRYPTO_CRC32_H
+
+#include <asr/defs>
+
+namespace asr {
+namespace crypto {
+
+    /**
+     * @brief Returns the CRC32 hash of the given data.
+     * 
+     * @param data Data buffer to hash.
+     * @param length Length of the data buffer. If -1, the length is calculated using strlen.
+     * @param value Initial value for CRC32. Default is 0xFFFFFFFFUL.
+     * @return uint32_t 
+     */
+    uint32_t crc32 (const char *data, int length=-1, uint32_t value=0xFFFFFFFFUL);
+
+}};
+
+#endif

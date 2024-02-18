@@ -1,0 +1,194 @@
+#ifndef __ASR_EVENTS_EVENT_H
+#define __ASR_EVENTS_EVENT_H
+
+#include <asr/utils/List>
+#include <asr/defs>
+
+namespace asr {
+namespace events {
+
+    using asr::utils::List;
+    using asr::utils::Linkable;
+
+    /**
+     * Converts a eventGroup:eventCode pair to a single 24-bit integer describing an event code.
+     */
+    #define EVTCODE(grp, code)      ((((grp)<<8)&ASR_EVENT_GRP_MASK)|((code)&ASR_EVENT_CODE_MASK))
+    #define EVTGRP(grp)             (((grp)<<8)&ASR_EVENT_GRP_MASK)
+
+    /**
+     * Maximum number of event types (and masks).
+     */
+    #define ASR_MAX_EVENT_CODES		256
+    #define ASR_EVENT_CODE_MASK		0x0000FF
+    #define ASR_EVENT_GRP_MASK		0xFFFF00
+
+    // Forward declaration.
+    class Event;
+
+    /**
+     * Event listener structure.
+     */
+    struct EventListener
+    {
+        /**
+         * @brief Indicates if the listener has been silenced if greater than zero. When so, the handler will not be executed.
+         */
+        int silent;
+
+        /**
+         * @brief Event group (zero is the default global group).
+         */
+        int eventGroup;
+
+        /**
+         * @brief Handler function.
+         */
+        void (*handler) (Event*);
+
+        /**
+         * @brief Constructs the event listener.
+         */
+        EventListener (int eventGroup, void (*handler) (Event*)) : silent(0), eventGroup(eventGroup), handler(handler) { }
+    };
+
+    /**
+     * @brief Holds the information about a triggered event. It also provides a mechanism to allow asynchronous event
+     * propagation and ensure the event chain order.
+     */
+    class Event
+    {
+        private:
+
+        /**
+         * @brief Indicates if the most recent event handler called wants to use async mode. Set by
+         * calling the `wait` method.
+         */
+        bool isAsync;
+
+        /**
+         * @brief Indicates if the event should be destroyed when calling the `destroy` method. Cleared
+         * by calling the `keep` method, useful to reuse event objects.
+         */
+        bool destroyable;
+
+        /**
+         * @brief Queue of listeners to invoke.
+         */
+        List<EventListener*> *list;
+
+        /**
+         * @brief Node to the next event listener to execute (iterator).
+         */
+        Linkable<EventListener*> *i;
+
+        /**
+         * @brief Next event to be dispatched (when events are chained).
+         */
+        Event *next;
+
+
+        public:
+
+        /**
+         * @brief Code of the event.
+         */
+        int eventCode;
+
+        /**
+         * @brief Root event (when events are chained using the `enqueue` method).
+         */
+        Event *root;
+
+        /**
+         * @brief Time of the event in milliseconds.
+         */
+        uint32_t eventTime;
+
+        /**
+         */
+        Event (int eventCode, int eventGroup=0, uint32_t eventTime=0)
+        {
+            this->eventCode = EVTCODE(eventGroup, eventCode);
+            this->eventTime = 0;
+            this->destroyable = true;
+
+            this->root = nullptr;
+            this->next = nullptr;
+            this->list = nullptr;
+        }
+
+        /**
+         * @brief Destroy the event and all its chained events.
+         */
+        virtual ~Event();
+
+
+        /**
+         * @brief Destroys the event if the `destroyable` flag is set.
+         */
+        void destroy() {
+            if (destroyable)
+                delete this;
+        }
+
+
+        /**
+         * @brief Sets the `destroyable` flag to `false`, to prevent the event from being deleted when calling
+         * the `destroy` method. Useful to reuse event objects.
+         *
+         * @return Event*
+         */
+        Event *keep() {
+            destroyable = false;
+            return this;
+        }
+
+
+        /**
+         * @brief Sets the event group.
+         * @return Event*
+         */
+        Event *setGroup (int eventGroup)
+        {
+            this->eventCode = EVTCODE(eventGroup, this->eventCode);
+            return this;
+        }
+
+
+        /**
+         * @brief Resets the event to its initial state. An event object can be reused by resetting it and later
+         * calling the resume method.
+         */
+        void reset (List<EventListener*> *list=nullptr);
+
+
+        /**
+         * @brief Sets the internal asynchronous flag, should be called before a handler returns. If a handler calls
+         * this method it should also call `resume` when all async operations are finished.
+         *
+         * @return Event*
+         */
+        Event *wait() {
+            isAsync = true;
+            return this;
+        }
+
+
+        /**
+         * @brief Resumes event propagation. Should be called if an event handler had previously called `wait`.
+         * @return Event*
+         */
+        Event *resume();
+
+        
+        /**
+         * @brief Adds the specified event to the bottom of the event chain.
+         * @param event 
+         */
+        void enqueue (Event *event);
+    };
+
+}};
+
+#endif

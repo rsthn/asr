@@ -1,0 +1,96 @@
+#ifndef __ASR_UTILS_NAMEVALUEPAIR_H
+#define __ASR_UTILS_NAMEVALUEPAIR_H
+
+#include <asr/utils/Comparator>
+#include <asr/utils/Destroyer>
+#include <asr/utils/Hash>
+
+namespace asr {
+namespace utils {
+
+	/**
+	**	Template class for key-value pairs composed of a string and a value. For a more generic class use Pair.
+	*/
+	template<typename T>
+	class NameValuePair
+	{
+		public:
+
+		/**
+		**	Components.
+		*/
+		String *name;
+		T value;
+
+		/**
+		**	Constructs the instance and sets the values of the pair.
+		*/
+		NameValuePair (String *name, T value) : name(name), value(value) { }
+
+		NameValuePair (const NameValuePair *src) : name(src->name), value(src->value) { }
+		NameValuePair (const NameValuePair& src) : name(src.name), value(src.value) { }
+
+		/**
+		**	Destroys the pair object and all values. To preserve values call reset() first.
+		*/
+		~NameValuePair()
+		{
+			clear();
+		}
+
+		/**
+		**	Deletes the contents. Valid only if type T is pointer to object.
+		*/
+		NameValuePair *clear()
+		{
+			Destroyer<String*>::destroy(name);
+			Destroyer<T>::destroy(value);
+
+			return this;
+		}
+
+		/**
+		**	Removes references to the values. Values are not deleted.
+		*/
+		NameValuePair *reset()
+		{
+			Destroyer<String*>::destroy(name, false);
+			Destroyer<T>::destroy(value, false);
+
+			return this;
+		}
+
+		/**
+		**	Compares the pair against the given one and returns the result.
+		*/
+		int compare (const NameValuePair *value) const
+		{
+			int tmp = Comparator<String*>::compare(this->name, value->name);
+			if (!tmp) tmp = Comparator<T>::compare(this->value, value->value);
+
+			return tmp;
+		}
+
+		int inline compare (const NameValuePair& value) const { return compare(&value); }
+
+		/**
+		**	Compares the pair's name value against the given value and returns the result.
+		*/
+		template<typename K>
+		int compare (K value) const
+		{
+			return ComparatorB<String*,K>::compare(this->name, value);
+		}
+
+		/**
+		**	Returns the hash of the key of the pair.
+		*/
+		uint32_t getHash() const
+		{
+			return Hash<String*>::get(this->name);
+		}
+	};
+
+}};
+
+#endif

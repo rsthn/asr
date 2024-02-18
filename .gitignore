@@ -1,0 +1,8 @@
+.svn
+obj
+lib
+*.exe
+*.o
+*.a
+Makefile
+todo.txt

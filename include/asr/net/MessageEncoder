@@ -1,0 +1,100 @@
+#ifndef __ASR_NET_MESSAGE_ENCODER_H
+#define __ASR_NET_MESSAGE_ENCODER_H
+
+#include <asr/net/MessageSchema>
+#include <asr/io/Buffer>
+
+namespace asr {
+namespace net {
+
+    using asr::io::Buffer;
+
+    /**
+     * @brief Packs or unpacks messages using a message schema.
+     */
+
+    class MessageEncoder
+    {
+        public:
+
+        /**
+         * @brief The message schema to use for reading the message.
+         */
+        const MessageSchema *schema;
+
+        /**
+         * @brief The current field being read.
+         */
+        MessageSchema::Field *field;
+
+        /**
+         */
+        MessageEncoder (const MessageSchema *schema) : schema(schema) {
+            reset();
+        }
+
+        virtual ~MessageEncoder() { }
+
+        /**
+         * @brief Resets the encoder to start reading from the root field.
+         */
+        void reset() {
+            field = schema->root;
+        }
+
+
+        /**
+         * @brief Feeds partial message data to the reader. Returns `true` if a full message has been read. If more data
+         * is required to complete the message `false` will be returned. Throws Error if the message is invalid.
+         *
+         * @param input Buffer to read from.
+         * @param output Structure to write to.
+         * @return `true` for a full message, `false` for a partial message
+         */
+        bool read (Buffer *input, void *output)
+        {
+            while (field != nullptr) {
+                try {
+                    field = field->read(input, (char *)output);
+                }
+                catch (MessageSchema::ErrorNotEnoughData &e) {
+                    return false;
+                }
+                catch (Error &e) {
+                    reset();
+                    throw;
+                }
+            };
+
+            reset();
+            return true;
+        }
+
+
+        /**
+         * @brief Writes a message to a buffer from an input structure. Throws Error if the structure is invalid.
+         *
+         * @param output Buffer to write to.
+         * @param input Structure to read from.
+         * @return `true` for success, `false` for failure (not enough buffer space).
+         */
+        bool write (Buffer *output, void *input)
+        {
+            MessageSchema::Field *field = schema->root;
+            while (field != nullptr) {
+                try {
+                    field = field->write(output, (char *)input);
+                }
+                catch (MessageSchema::ErrorNotEnoughSpace &e) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+    };
+
+
+}};
+
+#endif

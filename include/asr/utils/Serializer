@@ -1,0 +1,309 @@
+#ifndef __ASR_UTILS_SERIALIZER_H
+#define __ASR_UTILS_SERIALIZER_H
+
+#include <stdexcept>
+
+#include <type_traits>
+#include <asr/utils/Traits>
+
+#include <asr/utils/Object>
+#include <asr/io/Buffer>
+
+namespace asr {
+namespace utils {
+
+	using asr::io::Buffer;
+
+	/**
+	**	Generic utility to serialize items of type T.
+	**
+	**	void Serializer<T>::flatten(T t, Buffer *output)
+	**	Object *Serializer<T>::flatten(T t)
+	*/
+
+	template<typename T, int=
+		1*(std::is_pointer<T>::value) |
+		2*(std::is_arithmetic<T>::value || std::is_arithmetic<typename std::remove_pointer<T>::type>::value) |
+		4*(std::is_class<T>::value || std::is_class<typename std::remove_pointer<T>::type>::value)>
+	struct Serializer {
+	};
+
+	template<> /* const character string */
+	struct Serializer<const char *,3>
+	{
+		static inline void flatten (const char *value, Buffer *output) {
+			output->writeInt16(strlen(value)); output->write(value);
+		}
+
+		static inline Object *flatten (const char *value) {
+			return new Object (value);
+		}
+
+		static inline const char *unflatten (Buffer *input) {
+			int len = input->readInt16();
+			if (len < 0) return nullptr;
+
+			return input->read(len);
+		}
+
+		static inline const char *unflatten (Object *value) {
+			return asr::strclone(value->getString()->c_str());
+		}
+	};
+
+	template<> /* character string */
+	struct Serializer<char *,3>
+	{
+		static inline void flatten (char *value, Buffer *output) {
+			output->writeInt16(strlen(value)); output->write(value);
+		}
+
+		static inline Object *flatten (char *value) {
+			return new Object (value);
+		}
+
+		static inline char *unflatten (Buffer *input) {
+			int len = input->readInt16();
+			if (len < 0) return nullptr;
+
+			return input->read(len);
+		}
+
+		static inline char *unflatten (Object *value) {
+			return asr::strclone(value->getString()->c_str());
+		}
+	};
+
+	template<> /* int constant */
+	struct Serializer<int,2>
+	{
+		static inline void flatten (int value, Buffer *output) {
+			output->writeInt32(value);
+		}
+
+		static inline Object *flatten (int value) {
+			return new Object ((double)value);
+		}
+
+		static inline int unflatten (Buffer *input) {
+			return input->readInt32();
+		}
+
+		static inline int unflatten (Object *value) {
+			return value->getInt();
+		}
+	};
+
+	template<> /* float constant */
+	struct Serializer<float,2>
+	{
+		static inline Object *flatten (float value) {
+			return new Object (value);
+		}
+	};
+
+	template<> /* double constant */
+	struct Serializer<double,2>
+	{
+		static inline Object *flatten (double value) {
+			return new Object (value);
+		}
+	};
+
+	template<> /* boolean constant */
+	struct Serializer<bool,2>
+	{
+		static inline void flatten (bool value, Buffer *output) {
+			output->writeByte(value ? 1 : 0);
+		}
+
+		static inline Object *flatten (bool value) {
+			return new Object (value);
+		}
+
+		static inline bool unflatten (Buffer *input) {
+			return input->readByte() == 1 ? true : false;
+		}
+
+		static inline bool unflatten (Object *value) {
+			return value->getBool();
+		}
+	};
+
+	template<typename T> /* pointer */
+	struct Serializer<T,1>
+	{
+		static inline void flatten (T value, Buffer *output)
+		{
+			Serializer<typename std::remove_pointer<T>::type>::flatten (*value, output);
+		}
+
+		static inline Object *flatten (T value)
+		{
+			return Serializer<typename std::remove_pointer<T>::type>::flatten (*value);
+		}
+	};
+
+	template<typename T> /* pointer to arithmetic */
+	struct Serializer<T,3>
+	{
+		static inline void flatten (T value, Buffer *output)
+		{
+			Serializer<typename std::remove_pointer<T>::type>::flatten (*value, output);
+		}
+
+		static inline Object *flatten (T value)
+		{
+			return Serializer<typename std::remove_pointer<T>::type>::flatten (*value);
+		}
+	};
+
+	template<typename T> /* class */
+	struct Serializer<T,4>
+	{
+		static inline void flatten (T value, Buffer *output)
+		{
+			value.flatten(output);
+		}
+
+		static inline Object *flatten (T value)
+		{
+			return value.flatten();
+		}
+	};
+
+	template<typename T> /* pointer to class */
+	struct Serializer<T,5>
+	{
+		static inline void flatten (T value, Buffer *output)
+		{
+			value->flatten(output);
+		}
+
+		static inline Object *flatten (T value)
+		{
+			return value->flatten();
+		}
+
+		static inline T unflatten (Buffer *input)
+		{
+			return std::remove_pointer<T>::type::unflatten(input);
+		}
+
+		static inline T unflatten (Object *input)
+		{
+			return std::remove_pointer<T>::type::unflatten(input);
+		}
+	};
+
+	/* **************************************************************** */
+
+	/* ~ */
+	template<typename T> /* pointer to List */
+	struct Serializer<List<T>*,5>
+	{
+		static inline void flatten (List<T> *value, Buffer *output)
+		{
+			output->writeInt32(value->length());
+
+			for (auto i = value->head(); i; i = i->next)
+				Serializer<T>::flatten(i->value, output);
+		}
+
+		static inline Object *flatten (List<T> *value)
+		{
+			Object *obj = new Object(Object::ARRAY);
+
+			for (auto i = value->head(); i; i = i->next)
+				obj->add(Serializer<T>::flatten(i->value));
+
+			return obj;
+		}
+
+		static inline List<T> *unflatten (Buffer *input, List<T> *output=nullptr)
+		{
+			if (output == nullptr) output = new List<T>();
+
+			int count = input->readInt32();
+
+			for (int i = 0; i < count; i++)
+				output->push(Serializer<T>::unflatten(input));
+
+			return output;
+		}
+
+		static inline List<T> *unflatten (Object *value, List<T> *output=nullptr)
+		{
+			if (value == nullptr)
+				throw std::runtime_error("not_null");
+
+			if (value->getType() != Object::ARRAY)
+				throw std::runtime_error("requires_array");
+
+			if (output == nullptr) output = new List<T>();
+
+			for (auto i = value->getArrayData()->head(); i; i = i->next)
+				output->push(Serializer<T>::unflatten(i->value));
+
+			return output;
+		}
+	};
+
+	/* ~ */
+	template<typename T> /* pointer to Array */
+	struct Serializer<Array<T>*,5>
+	{
+		static inline void flatten (Array<T> *value, Buffer *output)
+		{
+			output->writeInt32(value->length);
+
+			for (int i = 0; i < value->length; i++)
+				Serializer<T>::flatten(value->array[i], output);
+		}
+
+		static inline Object *flatten (Array<T> *value)
+		{
+			Object *obj = new Object(Object::ARRAY);
+
+			for (int i = 0; i < value->length; i++)
+				obj->add(Serializer<T>::flatten(value->array[i]));
+
+			return obj;
+		}
+
+		static inline Array<T> *unflatten (Buffer *input, Array<T> *output=nullptr)
+		{
+			int length = input->readInt32();
+
+			if (output == nullptr)
+				output = new Array<T>(length);
+
+			for (int i = 0; i < length; i++)
+				output->set(i, Serializer<T>::unflatten(input));
+
+			return output;
+		}
+
+		static inline Array<T> *unflatten (Object *value, Array<T> *output=nullptr)
+		{
+			if (value == nullptr)
+				throw std::runtime_error("not_null");
+
+			if (value->getType() != Object::ARRAY)
+				throw std::runtime_error("requires_array");
+
+			if (output == nullptr)
+				output = new Array<T>(value->length());
+
+			int j = 0;
+
+			for (auto i = value->getArrayData()->head(); i; i = i->next)
+				output->set(j++, Serializer<T>::unflatten(i->value));
+
+			return output;
+		}
+	};
+
+}};
+
+#endif

@@ -1,0 +1,104 @@
+#ifndef __ASR_UTILS_TRIAD_H
+#define __ASR_UTILS_TRIAD_H
+
+#include <asr/utils/Comparator>
+#include <asr/utils/Destroyer>
+#include <asr/utils/Hash>
+
+namespace asr {
+namespace utils {
+
+	/**
+	**	Template class for item triads (3-values).
+	*/
+
+	template<typename Ta, typename Tb, typename Tc>
+	class Triad
+	{
+		public:
+
+		/**
+		**	Values.
+		*/
+		Ta a;
+		Tb b;
+		Tc c;
+
+		/**
+		**	Constructs the instance and sets the values of the triad.
+		*/
+		Triad (Ta a, Tb b, Tc c) : a(a), b(b), c(c) { }
+		Triad (Ta a, Tb b) : a(a), b(b) { }
+		Triad (Ta a) : a(a) { }
+		Triad () { }
+
+		Triad (const Triad *src) : a(src->a), b(src->b), c(src->c) { }
+		Triad (const Triad& src) : a(src.a), b(src.b), c(src.c) { }
+
+		/**
+		**	Destroys the triad object and all values. To preserve values call reset() first.
+		*/
+		~Triad()
+		{
+			clear();
+		}
+
+		/**
+		**	Deletes the contents. Valid only if type Ta, Tb or Tc are pointers to objects.
+		*/
+		Triad *clear()
+		{
+			Destroyer<Ta>::destroy(a);
+			Destroyer<Tb>::destroy(b);
+			Destroyer<Tc>::destroy(c);
+
+			return this;
+		}
+
+		/**
+		**	Removes references to the values. Values are not deleted.
+		*/
+		Triad *reset()
+		{
+			Destroyer<Ta>::destroy(a, false);
+			Destroyer<Tb>::destroy(b, false);
+			Destroyer<Tc>::destroy(c, false);
+
+			return this;
+		}
+
+		/**
+		**	Compares the triad against the given one and returns the result.
+		*/
+		int compare (const Triad *value) const
+		{
+			int tmp = Comparator<Ta>::compare(this->a, value->a);
+			if (!tmp) tmp = Comparator<Tb>::compare(this->b, value->b);
+			if (!tmp) tmp = Comparator<Tc>::compare(this->c, value->c);
+
+			return tmp;
+		}
+
+		int inline compare (const Triad& value) const { return compare(&value); }
+
+		/**
+		**	Compares the triad's first value against the given value and returns the result.
+		*/
+		template<typename K>
+		int compare (K value) const
+		{
+			return ComparatorB<Ta,K>::compare(this->a, value);
+		}
+
+		/**
+		**	Returns the hash of the first value of the pair.
+		*/
+		uint32_t getHash() const
+		{
+			return Hash<Ta>::get(this->a);
+		}
+	};
+
+}};
+
+#endif

@@ -1,0 +1,266 @@
+#ifndef __ASR_UTILS_OBJECT_H
+#define __ASR_UTILS_OBJECT_H
+
+#include <asr/utils/List>
+#include <asr/utils/String>
+#include <asr/utils/Map>
+
+#include <asr/io/Buffer>
+#include <asr/io/FileOutputStream>
+
+#include <cstdio>
+
+namespace asr {
+namespace utils {
+
+	using asr::io::Buffer;
+	using asr::io::FileOutputStream;
+
+	/**
+	**	Object manipulation utility class.
+	*/
+
+	class Object
+	{
+		public:
+
+		/**
+		**	Available types of objects.
+		*/
+		static constexpr const int OBJECT	=	0x00;
+		static constexpr const int ARRAY	=	0x01;
+		static constexpr const int BOOL		=	0x02;
+		static constexpr const int NUMERIC	=	0x03;
+		static constexpr const int STRING	=	0x04;
+		static constexpr const int NUL		=	0x05;
+		static constexpr const int POINTER	=	0x06;
+
+		private:
+
+		/**
+		**	Temporal string used when parsing an object from JSON data.
+		*/
+		static String* buffer;
+
+		/**
+		**	Type of the object.
+		*/
+		int type;
+
+		/**
+		**	Value of the object.
+		*/
+		union {
+			List<Object*>* _array;
+			Map<const String*, Object*>* _object;
+			bool _bool;
+			double _numeric;
+			String* _string;
+			void* _pointer;
+		}
+		value;
+
+		/**
+		**	Returns the value of a digit.
+		*/
+		static int digit (char value)
+		{
+			return (value >= '0' && value <= '9') ? (value - '0') : ((value & 0xDF) - 'A' + 0x0A);
+		}
+
+		public:
+
+		/**
+		**	Constructs an object of the specified type.
+		*/
+		Object (int type=Object::OBJECT);
+
+		/**
+		**	Constructs an object with NULL value.
+		*/
+		Object (std::nullptr_t value);
+
+		/**
+		**	Constructs a boolean object.
+		*/
+		Object (bool value);
+
+		/**
+		**	Constructs a numeric object.
+		*/
+		Object (double value);
+
+		/**
+		**	Constructs a string object.
+		*/
+		Object (String* value);
+		Object (const char* value) : Object(new String(value)) { }
+
+		/**
+		**	Destroys the object and its contents.
+		*/
+		virtual ~Object();
+
+		/**
+		**	Returns the type of the object.
+		*/
+		int getType();
+
+		/**
+		**	Returns the number of objects contained. Requires Object::ARRAY or Object::OBJECT.
+		*/
+		int length();
+
+		/**
+		**	Returns a Map with the contents of the OBJECT.
+		*/
+		LList<Pair<const String*,Object*>*> *getObjectData(const char* name);
+		LList<Pair<const String*,Object*>*> *getObjectData(int index);
+		LList<Pair<const String*,Object*>*> *getObjectData();
+		LList<Pair<const String*,Object*>*> *getObjectData(const String* name) { return getObjectData(name->c_str()); }
+
+		/**
+		**	Returns the named/indexed OBJECT or nullptr if not found (or if not an OBJECT).
+		*/
+		Object *getObject(const char* name);
+		Object *getObject(int index);
+		Object *getObject(const String* name) { return getObject(name->c_str()); }
+
+			/**
+			**	Returns boolean indicating if the property exists in the OBJECT.
+			*/
+			bool has (const char* name);
+			bool has (const String* name) { return has(name->c_str()); }
+
+			/**
+			**	Returns a property given its name, requires object to be Object::OBJECT.
+			*/
+			Object *get (const char* name);
+			Object *get (const String* name) { return get(name->c_str()); }
+
+			/**
+			**	Sets the value of a property. Requires object to be of type Object::OBJECT. If the name already exists the previous value
+			**	will be deleted (if _delete is true) and the new value will be stored.
+			*/
+			Object *set (const char* name, Object* value, bool _delete=true);
+			Object *set (const char* name, std::nullptr_t value, bool _delete=true) { return set(name, new Object(value), _delete); }
+			Object *set (const char* name, bool value, bool _delete=true) { return set(name, new Object(value), _delete); }
+			Object *set (const char* name, int value, bool _delete=true) { return set(name, new Object((double)value), _delete); }
+			Object *set (const char* name, double value, bool _delete=true) { return set(name, new Object(value), _delete); }
+			Object *set (const char* name, const String* value, bool _delete=true) { return set(name, new Object(value), _delete); }
+			Object *set (const char* name, const char* value, bool _delete=true) { return set(name, new Object(value), _delete); }
+
+			Object *set (const String* name, Object* value, bool _delete=true) { return set(name->c_str(), value, _delete); }
+			Object *set (const String* name, std::nullptr_t value, bool _delete=true) { return set(name->c_str(), new Object(value), _delete); }
+			Object *set (const String* name, bool value, bool _delete=true) { return set(name->c_str(), new Object(value), _delete); }
+			Object *set (const String* name, int value, bool _delete=true) { return set(name->c_str(), new Object((double)value), _delete); }
+			Object *set (const String* name, double value, bool _delete=true) { return set(name->c_str(), new Object(value), _delete); }
+			Object *set (const String* name, String* value, bool _delete=true) { return set(name->c_str(), new Object(value), _delete); }
+			Object *set (const String* name, const char* value, bool _delete=true) { return set(name->c_str(), new Object(value), _delete); }
+
+			/**
+			**	Removes a property from an OBJECT given its name and returns it, unless the _delete parameter is set to true
+			**	in which case nullptr will be returned and the property will be removed and deleted.
+			*/
+			Object *remove (const char* name, bool _delete=true);
+			Object *remove (const String* name, bool _delete=true) { return remove(name->c_str(), _delete); }
+
+		/**
+		**	Returns an Object list with the contents of the ARRAY.
+		*/
+		List<Object*> *getArrayData(const char* name);
+		List<Object*> *getArrayData(int index);
+		List<Object*> *getArrayData();
+		List<Object*> *getArrayData(const String* name) { return getArrayData(name->c_str()); }
+
+		/**
+		**	Returns the named/indexed ARRAY or nullptr if not found (or if not an ARRAY).
+		*/
+		Object *getArray(int index);
+		Object *getArray(const char* name);
+		Object *getArray(const String* name) { return getArray(name->c_str()); }
+
+			/**
+			**	Returns the object at the given index of the ARRAY.
+			*/
+			Object *get (int index);
+
+			/**
+			**	Adds an object to the ARRAY.
+			*/
+			Object *add (Object* value);
+			Object *add (std::nullptr_t value) { return add(new Object(value)); }
+			Object *add (bool value) { return add(new Object(value)); }
+			Object *add (int value) { return add(new Object((double)value)); }
+			Object *add (double value) { return add(new Object(value)); }
+			Object *add (const String* value) { return add(new Object(value)); }
+			Object *add (const char* value) { return add(new Object(value)); }
+
+			/**
+			**	Removes an object from the ARRAY given its index and returns it, unless the _delete parameter is set to true
+			**	in which case nullptr will be returned and the object will be removed and deleted.
+			*/
+			Object *remove (int index, bool _delete=true);
+
+		/**
+		**	Returns the string value of the object (requires type Object::STRING). If the nullify flag is set the object will be converted into
+		**	a NUL object, such that when the object is deleted the string will be preserved. Useful when you want to discard the object but keep the string.
+		*/
+		String* getString(bool nullify=false);
+		String* getString(int index, bool nullify=false);
+		String* getString(const char* name, bool nullify=false);
+		String* getString(const String* name, bool nullify=false) { return getString(name->c_str(), nullify); }
+
+		/**
+		**	Returns the numeric value of the object (requires type Object::NUMERIC, Object::BOOL, or Object::STRING - if the later, it will be converter to double value).
+		*/
+		double getNumeric();
+		double getNumeric(int index);
+		double getNumeric(const char* name);
+		double getNumeric(const String* name) { return getNumeric(name->c_str()); }
+
+		/**
+		**	Returns the bool value of the object (requires type Object::BOOL, Object::NUMERIC or Object::STRING - if the later, will be compared against true/false).
+		*/
+		bool getBool();
+		bool getBool(int index);
+		bool getBool(const char* name);
+		bool getBool(const String* name) { return getBool(name->c_str()); }
+
+		/**
+		**	Returns the integer numeric value of the object (same as calling (int)_numeric()).
+		*/
+		int getInt();
+		int getInt(int index);
+		int getInt(const char* name);
+		int getInt(const String* name) { return getInt(name->c_str()); }
+
+		/**
+		**	Parses an object from the specified stream (JSON format) and returns it.
+		*/
+		static Object *loadFrom (FILE *input);
+
+		/**
+		**	Parses an object from the specified file (JSON format) and returns it.
+		*/
+		static Object *loadFrom (const char *filename);
+
+		/**
+		**	Saves the object to the specified Buffer (JSON format).
+		*/
+		void saveTo (Buffer *output, bool pretty=false, bool strict=true, int level=0);
+
+		/**
+		**	Saves the object to the specified FILE (JSON format).
+		*/
+		bool saveTo (FILE *output, bool pretty=false, bool strict=true);
+
+		/**
+		**	Saves the object to the specified file (JSON format).
+		*/
+		bool saveTo (const char *filename, bool pretty=false, bool strict=true);
+	};
+
+}};
+
+#endif

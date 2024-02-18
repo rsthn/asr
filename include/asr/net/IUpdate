@@ -1,0 +1,19 @@
+#ifndef __ASR_NET_IUPDATE_H
+#define __ASR_NET_IUPDATE_H
+
+namespace asr {
+namespace net {
+
+    /**
+     * @brief Interface defining an update method.
+     */
+    class IUpdate
+    {
+        public:
+
+        virtual void update (time_t time) = 0;
+    };
+
+}};
+
+#endif

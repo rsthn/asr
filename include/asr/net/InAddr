@@ -1,0 +1,178 @@
+#ifndef __ASR_NET_INADDR_H
+#define __ASR_NET_INADDR_H
+
+#include <asr/defs>
+#include <cstring>
+
+#if __WIN32__
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+#else
+    #include <sys/socket.h>
+    #include <arpa/inet.h>
+    #include <netdb.h>
+    #include <unistd.h>
+    #include <fcntl.h>
+    #include <errno.h>
+#endif
+
+namespace asr {
+namespace net {
+
+    /**
+     * @brief Utility class to manipulate internet address descriptors.
+     */
+
+    class InAddr
+    {
+        public:
+
+        /**
+         * @brief Internet address descriptor.
+         */
+        struct sockaddr_in descriptor;
+
+        /**
+         * @brief Descriptor length.
+         */
+        socklen_t length;
+
+        /**
+         */
+        InAddr();
+
+        /**
+         * @brief Creates an internet address with the specified address and port.
+         * @param address 
+         * @param port 
+         */
+        InAddr (const char *address, int port) : InAddr() {
+            this->setAddrStr(address);
+            this->setPort(port);
+        }
+
+        /**
+        */
+        virtual ~InAddr()
+        { }
+
+
+        /**
+         * @brief Clears the descriptor to all zero values.
+         * @return InAddr* 
+         */
+        InAddr *clear() {
+            memset (&descriptor, 0, sizeof(decltype(descriptor)));
+            return this->setFamily(AF_INET);
+        }
+
+
+        /**
+         * @brief Sets the family of the internet address.
+         * @param type One of the AF_* constants.
+         * @return InAddr* 
+         */
+        InAddr *setFamily (int type) {
+            descriptor.sin_family = type;
+            return this;
+        }
+
+
+        /**
+         * @brief Returns the family of the internet address.
+         * @return int 
+         */
+        int getFamily() const {
+            return descriptor.sin_family;
+        }
+
+
+        /**
+         * @brief Sets the port number related to the internet address.
+         * @param port 
+         * @return InAddr* 
+         */
+        InAddr *setPort (int port) {
+            descriptor.sin_port = ::htons(port);
+            return this;
+        }
+
+
+        /**
+         * @brief Returns the port of the internet address.
+         * @return int 
+         */
+        int getPort() const {
+            return ::ntohs(descriptor.sin_port);
+        }
+
+
+        /**
+         * @brief Sets the address using an IP address string.
+         * @param addr A value of nullptr will cause the address to be set to INADDR_ANY.
+         * @return InAddr* 
+         */
+        InAddr *setAddrStr (const char *addr)
+        {
+            if (addr != nullptr)
+            {
+                #if __WIN32__
+                    descriptor.sin_addr.s_addr = ::inet_addr(addr);
+                #else
+                    inet_pton (AF_INET, addr, &descriptor.sin_addr);
+                #endif
+            }
+            else
+                descriptor.sin_addr.s_addr = INADDR_ANY;
+
+            return this;
+        }
+
+
+        /**
+         * @brief Returns the IP address as string. Caller must copy the string somewhere else for further usage.
+         * @return const char* 
+         */
+        const char *getAddrStr() const {
+            return ::inet_ntoa(descriptor.sin_addr);
+        }
+
+
+        /**
+         * @brief Sets the IP address using a 32-bit unsigned integer.
+         * 
+         * @param addr 
+         * @return InAddr* 
+         */
+        InAddr *setAddrInt (uint32_t addr) {
+            descriptor.sin_addr.s_addr = ::htonl(addr);
+            return this;
+        }
+
+
+        /**
+         * @brief Returns the address as a 32-bit unsigned integer.
+         * @return uint32_t 
+         */
+        uint32_t getAddrInt() const {
+            return ::ntohl(descriptor.sin_addr.s_addr);
+        }
+
+
+        /**
+         * @brief Sets the address, port and family from another InAddr object.
+         * @param addr 
+         * @return InAddr* 
+         */
+        InAddr *set (InAddr *addr)
+        {
+            this->setAddrInt (addr->getAddrInt());
+            this->setPort(addr->getPort());
+            this->setFamily(addr->getFamily());
+            return this;
+        }
+    };
+
+}};
+
+#endif

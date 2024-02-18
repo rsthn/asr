@@ -1,0 +1,158 @@
+#ifndef __ASR_NET_SERVER_H
+#define __ASR_NET_SERVER_H
+
+#include <asr/net/Handler>
+#include <asr/net/Socket>
+#include <asr/net/Manager>
+#include <asr/io/Stream>
+
+namespace asr {
+namespace net {
+
+    typedef Handler* HandlerCreator();
+
+    /**
+     * @brief Responsible for waiting for connections and creating proper data channels when they arrive. Another handler
+     * will handle the connection protocol.
+     */
+
+    class Server : public Handler
+    {
+        private:
+
+        /**
+         * @brief Creator of the handlers.
+         */
+        HandlerCreator *creator;
+
+        /**
+         * @brief Max connections the server will accept before it auto stops. Defaults to 0 (infinite).
+         */
+        int lifeLeft;
+
+        /**
+         * @brief Indicates if the process will be forked on connection arrival.
+         */
+        bool forkingEnabled;
+
+        /**
+         * @brief Indicates if the server is ready.
+         */
+        bool _ready;
+
+
+        public:
+        
+        /**
+         * @brief Creates a channel and allocates its respective socket. The new channel will be added to the
+         * global channel manager automatically.
+         */
+        Server (HandlerCreator *creator, int port, const char *address = nullptr, int lifeLeft = 0)
+        {
+            this->creator = creator;
+            this->lifeLeft = lifeLeft;
+            this->forkingEnabled = false;
+            this->_ready = false;
+
+            Socket *socket = new Socket (SOCK_STREAM);
+            if (!socket->valid()) {
+                delete socket;
+                return;
+            }
+
+            if (!socket->bind(port, address)) {
+                delete socket;
+                return;
+            }
+
+            if (!socket->listen()) {
+                delete socket;
+                return;
+            }
+
+            if (!manager->add (new Channel (socket, this))) {
+                delete socket;
+                return;
+            }
+
+            this->_ready = true;
+        }
+
+
+        /**
+         * @brief Destroys the handler server.
+         */
+        virtual ~Server() { }
+
+
+        /**
+         * @brief Returns `true` if the server is ready.
+         */
+        bool ready() const {
+            return _ready;
+        }
+
+
+        /**
+         * @brief Enables process forking for parallel connection handling.
+         */
+        Server *enableParallel (bool state)
+        {
+            forkingEnabled = state;
+            return this;
+        }
+
+
+        /**
+         * @brief Accepts a connection, creates a new data channel and binds a new handler to it.
+         */
+        virtual bool dataAvailable (Buffer *input, Buffer *output)
+        {
+            Socket *socket = channel->socket->accept();
+            Handler *handler = creator();
+            Channel *channel = new Channel (socket, handler, new Stream());
+
+            #if __WIN32__
+                manager->add(channel);
+                return lifeLeft ? (!--lifeLeft ? false : true) : true;
+            #else
+                if (!forkingEnabled) {
+                    manager->add(channel);
+                    return lifeLeft ? (!--lifeLeft ? false : true) : true;
+                }
+
+                // Attempt to fork the process for parallel connection handling.
+                int pid = fork();
+                if (pid > 0) {
+                    // In parent: invalidate socket number to avoid unwanted shutdown.
+                    printf("INFO: Delegated connection to forked process %u\n", pid);
+                    channel->socket->invalidate();
+                    delete channel;
+                    manager->_totalChannels++;
+                    return lifeLeft ? (!--lifeLeft ? false : true) : true;
+                }
+
+                // On error, handle the connection locally.
+                if (pid < 0) {
+                    printf("ERROR: Unable to fork process. Handling connection locally.\n");
+                    manager->add(channel);
+                    return lifeLeft ? (!--lifeLeft ? false : true) : true;
+                }
+
+                // In child: delete all channels without shutting the socket and attach new channel.
+                manager->reset(true)->add(channel);
+                return false;
+            #endif
+        }
+
+        /**
+         * Fill in the blanks.
+         */
+        virtual bool connected() { return true; }
+        virtual void disconnected() { }
+        virtual bool update (time_t time, Buffer *output) { return true; }
+    };
+
+}};
+
+#endif

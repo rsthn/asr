@@ -1,0 +1,215 @@
+#ifndef __ASR_UTILS_STRING_H
+#define __ASR_UTILS_STRING_H
+
+#include <asr/defs>
+
+namespace asr {
+namespace utils {
+
+	/**
+	**	Class for variable length binary strings.
+	*/
+
+	class String
+	{
+		private:
+
+		/**
+		**	Length of allocated buffer.
+		*/
+		int bufferLength;
+
+		public:
+
+		/**
+		**	Value of the string.
+		*/
+		char *value;
+
+		/**
+		**	Length of the string.
+		*/
+		int length;
+
+		/**
+		**	Constructor from constant character buffer (if no length provided strlen will be used).
+		*/
+		String (const char *value=nullptr, int length=-1);
+
+		/**
+		**	Constructs the string from another string object.
+		*/
+		String (const String *string);
+
+		/**
+		**	Allocates a string with the specified buffer length but stores just a zero-length string.
+		*/
+		String (int length);
+
+		/**
+		**	Copy constructor.
+		*/
+		String (const String& string);
+
+		/**
+		**	Constructs a new string using the provided buffer without allocating any new memory. Make sure the buffer's
+		**	length is actually n+1 in order to use c_str() without errors.
+		*/
+		static String *fromBuffer (char *buffer, int length=-1);
+
+		/**
+		**	Deletes all allocated buffers.
+		*/
+		virtual ~String();
+
+		/**
+		**	Resets the string object to its initial conditions but does NOT deallocate the string buffer.
+		*/
+		String *invalidate();
+
+		/**
+		**	Forcefully changes the internal buffer of the string. Make sure the provided buffer's length actually is n+1 to use c_str() without errors.
+		*/
+		String *setBuffer (char *buffer, int length=-1);
+
+		/**
+		**	Resizes the length of the buffer to the given length. Note that if the underlying buffer is already of a size such that
+		**	is capable of holding length+1 bytes, then no physical resize will occur (but logically will).
+		*/
+		String *resize (int length);
+
+		/**
+		**	Returns the ASCIIZ representation of the string.
+		*/
+		const char *c_str() const;
+
+		/**
+		**	Returns the integer representation of the string.
+		*/
+		int c_int() const;
+
+		/**
+		**	Returns the double representation of the string.
+		*/
+		double c_double() const;
+
+		/**
+		**	Sets the string contents using the specified buffer.
+		*/
+		String *set (const char *buffer, int length=-1);
+		String *set (const String *str);
+
+		/**
+		**	Returns a clone of the string.
+		*/
+		String *clone() const;
+
+		/**
+		**	Chops the last N bytes of the string. The actual buffer is not modified at all, only the internal length indicator is reduced.
+		*/
+		String *chop (int numBytes=1);
+
+		/**
+		**	Removes all white-space from the beginning and end of the string.
+		*/
+		String *trim();
+
+		/**
+		**	Returns a new string made from the substring in the given range.
+		*/
+		String *substr (int from, int numBytes=0) const;
+
+		/**
+		**	Concatenates the current and the given string, returns new string.
+		*/
+		String *concat (const char *buffer, int length=-1);
+		String *concat (String *s);
+
+		/**
+		**	Appends a string or character to the current one. Doesn't return new string.
+		*/
+		String *append (const char *buffer, int length=-1);
+		String *append (String *s);
+		String *append (char ch);
+
+		/**
+		**	Converts the string to lower case.
+		*/
+		String *toLowerCase();
+
+		/**
+		**	Converts the string to upper case.
+		*/
+		String *toUpperCase();
+
+		/**
+		**	Replaces one character by another.
+		*/
+		String *replace (char a, char b);
+
+		/**
+		**	Returns a character from the specified index. Returns zero if index is out of bounds.
+		*/
+		char charAt (int index) const;
+
+		/**
+		**	Returns true if the provided string equals the current string.
+		*/
+		bool equals (const String *value) const;
+		bool equals (const char *str) const;
+
+		/**
+		**	Compares the strings and returns -1, 0 or 1 as strcmp would.
+		*/
+		int compare (const String *value) const;
+		int compare (const char *str) const;
+
+		/**
+		**	Returns a boolean indicating if the string ends with the same characters as the one provided.
+		*/
+		bool endsWith (const char *value, int length=-1) const;
+
+		/**
+		**	Returns a boolean indicating if the string starts with the same characters as the one provided.
+		*/
+		bool startsWith (const char *value, int length=-1) const;
+
+		/**
+		**	Returns a CRC32 hash of the given string. If length is not provided strlen will be used.
+		*/
+		static uint32_t getHash (const char *value, int length=-1);
+
+		/**
+		**	Returns the hash of the string.
+		*/
+		virtual uint32_t getHash() const;
+
+		/**
+		**	Formats a message and returns it as a new string.
+		*/
+		static String *printf (const char *msg, ...);
+
+		/**
+		 * Formats a message and returns a static internal buffer. Uses `vsnprintf` underneath to prevent buffer overflow.
+		 * Maximum buffer size is 1024 bytes.
+		 * 
+		 * @param msg C-string with standard `printf` format.
+		 * @param ... 
+		 * @return const char* 
+		 */
+		static const char *sprintf (const char *msg, ...);
+
+		/**
+		 * Formats a message and returns a new buffer. Uses `vsnprintf` underneath to prevent buffer overflow.
+		 * Maximum buffer size is 1024 bytes.
+		 * 
+		 * @param msg C-string with standard `printf` format.
+		 * @param ... 
+		 * @return const char* 
+		 */
+		static const char *ssprintf (const char *msg, ...);
+	};
+
+}};
+
+#endif

@@ -1,0 +1,85 @@
+LIB_DIR = lib
+OBJ_DIR = obj
+
+OBJS = obj/defs.o obj/String.o obj/Object.o obj/EventBus.o obj/Event.o obj/CRC32.o \
+	   obj/Buffer.o obj/FileInputStream.o obj/FileOutputStream.o obj/Stream.o \
+	   obj/InAddr.o obj/Socket.o obj/Channel.o obj/Manager.o
+
+EXAMPLES = examples/event_bus.exe examples/udp_client.exe examples/udp_server.exe
+
+CC = clang++
+CCFLAGS = -Qunused-arguments -Wno-format-security -fcolor-diagnostics -fansi-escape-codes -Wno-format -std=c++17 \
+		  -Iinclude -Llib -O1 -Wl,-s -static -pthread -static-libstdc++ -static-libgcc -Wno-switch -g
+
+vpath %.cpp src:src/crypto:src/events:src/io:src/net:src/utils:examples
+
+obj/%.o: %.cpp
+	@echo [90m - [96m$<[0m
+	@$(CC) $(CCFLAGS) -c -o $@ $<
+
+examples/%.exe: %.cpp
+	@echo [90m - [96m$<[0m
+	@$(CC) $< -o $@ -lasr -lwsock32
+
+build: lib
+all: clean lib
+
+user-env:
+	@if "%USR_INCLUDE%"=="" (echo Environment variable USR_INCLUDE not found. && exit 1)
+	@if "%USR_LIB%"=="" (echo Environment variable USR_LIB not found. && exit 1)
+
+clean:
+	@echo [97mCleaning ... [0m
+	@if exist $(LIB_DIR) (rmdir /s /q $(LIB_DIR))
+	@if exist $(OBJ_DIR) (rmdir /s /q $(OBJ_DIR))
+
+uninstall: user-env
+	@echo [97mUninstalling ... [0m
+	@if exist "%USR_INCLUDE%\asr" (rmdir /s /q "%USR_INCLUDE%\asr")
+	@if exist "%USR_LIB%\libasr.a" (del "%USR_LIB%\libasr.a")
+
+obj-folder:
+	@if not exist $(OBJ_DIR) (mkdir $(OBJ_DIR))
+
+lib-folder:
+	@if not exist $(LIB_DIR) (mkdir $(LIB_DIR))
+
+msg-1:
+	@echo [97mCompiling sources ... [0m
+
+lib: obj-folder lib-folder msg-1 $(OBJS)
+	@echo [97mBuilding library ... [0m
+	@if exist $(LIB_DIR)\libasr.a (del $(LIB_DIR)\libasr.a)
+	@ar rcs $(LIB_DIR)/libasr.a $(OBJS)
+
+install: uninstall clean user-env lib
+	@echo [97mDeploying include files ...[0m
+	@if exist "%USR_INCLUDE%\asr" (rmdir /s /q "%USR_INCLUDE%\asr")
+	@xcopy /s /y /k include\* "%USR_INCLUDE%" > nul
+	@echo [97mDeploying lib files ...[0m
+	@xcopy /s /y /k lib\* "%USR_LIB%" > nul
+	@echo [97mDone[0m
+
+msg-2:
+	@echo [97mBulding examples ... [0m
+
+examples: msg-2 $(EXAMPLES)
+	@echo [97mDone[0m
+
+# Build and run examples
+event_bus: examples/event_bus.exe
+	@$<
+udp_server: examples/udp_server.exe
+	@$<
+udp_client: examples/udp_client.exe
+	@$<
+tcp_server: examples/tcp_server.exe
+	@$<
+tcp_client: examples/tcp_client.exe
+	@$<
+custom_protocol_client: examples/custom_protocol.exe
+	@$< client
+custom_protocol_server: examples/custom_protocol.exe
+	@$< server
+custom_protocol_bomb: examples/custom_protocol.exe
+	@for /L %%i in (1,1,50) do start $< client
