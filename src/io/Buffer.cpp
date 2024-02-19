@@ -200,7 +200,7 @@ namespace io {
             offsetTop = _offsetTop;
         }
 
-        updateEOF();
+        updateEOF(bytesRead);
         return bytesRead;
     }
 

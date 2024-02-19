@@ -68,10 +68,11 @@ namespace io {
 
         /**
          * @brief Updates the EOF flag based on the buffer level.
+         * @param bytesRead Number of bytes read in the last operation. Helps to prevent false EOF detection.
          * @return Buffer*
          */
-        Buffer *updateEOF() {
-            _eof = bufferLevel == 0;
+        Buffer *updateEOF (int bytesRead=0) {
+            _eof = bufferLevel == 0 && !bytesRead;
             return this;
         }
 
