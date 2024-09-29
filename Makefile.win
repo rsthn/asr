@@ -1,11 +1,11 @@
 LIB_DIR = lib
 OBJ_DIR = obj
 
-OBJS = obj/defs.o obj/String.o obj/Object.o obj/EventBus.o obj/Event.o obj/CRC32.o \
+OBJS = obj/defs.o obj/ptr.o obj/EventBus.o obj/Event.o \
 	   obj/Buffer.o obj/FileInputStream.o obj/FileOutputStream.o obj/Stream.o \
 	   obj/InAddr.o obj/Socket.o obj/Channel.o obj/Manager.o
 
-EXAMPLES = examples/event_bus.exe examples/udp_client.exe examples/udp_server.exe
+EXAMPLES = examples/event_bus.exe examples/references.exe examples/udp_client.exe examples/udp_server.exe
 
 CC = clang++
 CCFLAGS = -Qunused-arguments -Wno-format-security -fcolor-diagnostics -fansi-escape-codes -Wno-format -std=c++17 \
@@ -22,7 +22,7 @@ examples/%.exe: %.cpp
 	@$(CC) $(CCFLAGS) $< -o $@ -lasr -lwsock32
 
 build: lib
-all: clean lib
+all: uninstall clean lib
 
 user-env:
 	@if "%USR_INCLUDE%"=="" (echo Environment variable USR_INCLUDE not found. && exit 1)
@@ -68,6 +68,8 @@ examples: msg-2 $(EXAMPLES)
 
 # Build and run examples
 event_bus: examples/event_bus.exe
+	@$<
+references: examples/references.exe
 	@$<
 udp_server: examples/udp_server.exe
 	@$<

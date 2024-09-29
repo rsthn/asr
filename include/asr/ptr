@@ -1,0 +1,91 @@
+#ifndef __ASR_PTR_H
+#define __ASR_PTR_H
+
+#include <unordered_map>
+#include <asr/defs>
+
+namespace asr
+{
+    class refs
+    {
+        public:
+        static std::unordered_map<void*, int> *memory;
+        static void *add (void *ptr);
+        static bool remove (void *ptr);
+        static void shutdown();
+    };
+
+    template<class T>
+    class ptr
+    {
+        private:
+
+        T *value = nullptr;
+
+        public:
+
+        /**
+         */
+        ptr() { }
+        ptr(T *value) { set(value); }
+        ptr(const ptr& other) { set(other.value); }
+        ptr(const ptr&& other) noexcept { set(other.value); }
+
+        virtual ~ptr() {
+            if (refs::remove(value))
+                delete value;
+        }
+
+        /**
+         */
+        T* operator->() const {
+            return value;
+        }
+
+        T* get() const {
+            return value;
+        }
+
+        void set (T *new_value)
+        {
+            if (value != new_value) {
+                if (refs::remove(value))
+                    delete value;
+                value = (T*)refs::add(new_value);
+            }
+        }
+
+        /**
+         */
+        ptr& operator=(const ptr& other) {
+            set(other.value);
+            return *this;
+        }
+
+        ptr& operator=(ptr&& other) noexcept
+        {
+            if (value == other.value)
+                return *this;
+
+            if (refs::remove(value))
+                delete value;
+
+            value = other.value;
+            other.value = nullptr;
+            return *this;
+        }
+
+        /**
+         */
+        bool operator==(void *other) const {
+            return value == other;
+        }
+
+        bool operator!=(void *other) const {
+            return value != other;
+        }
+
+    };
+};
+
+#endif

@@ -1,78 +1,49 @@
 
 #include <asr/events/EventBus>
+#include <iostream>
 
 namespace asr {
 namespace events {
 
     /**
-     * @brief Next free event code.
+     * Next free event code.
      */
     int EventBus::availableEventCode = 1;
 
     /**
-    */
-    EventBus::EventBus()
-    {
-        for (int i = 0; i < ASR_MAX_EVENT_CODES; i++)
-            this->listeners[i] = nullptr;
-
-        this->queue = new List<Event*>();
-    }
-
-    /**
-    */
-    EventBus::~EventBus()
-    {
-        for (int i = 0; i < ASR_MAX_EVENT_CODES; i++)
-            if (this->listeners[i] != nullptr) delete this->listeners[i];
-
-        delete this->queue;
-    }
-
-
-    /**
-     * @brief Resets the event bus by removing all listeners and empying the queue.
+     * Removes all listeners and empties the queue.
      */
     void EventBus::reset()
     {
         for (int i = 0; i < ASR_MAX_EVENT_CODES; i++)
-        {
-            if (this->listeners[i] != nullptr) {
-                delete this->listeners[i];
-                this->listeners[i] = nullptr;
-            }
-        }
+            listeners[i].clear();
 
-        this->queue->clear();
+        queue.clear();
     }
 
 
     /**
-     * @brief Adds an event listener for a specified event.
+     * Adds an event listener for a specified event.
      * 
      * @param eventGroup 
      * @param eventCode
      * @param handler
      * @return bool
      */
-    bool EventBus::on (int eventGroup, int eventCode, void (*handler)(Event*))
+    bool EventBus::on (int eventGroup, int eventCode, EventHandler *handler)
     {
         eventGroup = EVTGRP(eventGroup);
         eventCode &= ASR_EVENT_CODE_MASK;
         if (eventCode < 0 || eventCode >= ASR_MAX_EVENT_CODES)
             return false;
 
-        if (this->listeners[eventCode] == nullptr)
-            this->listeners[eventCode] = new List<EventListener*>();
-
-        EventListener *evl = new EventListener (eventGroup, handler);
-        this->listeners[eventCode]->push(evl);
+        listeners[eventCode].push_back(new EventListener (eventGroup, handler));
         return true;
     }
 
 
     /**
-     * @brief Removes an event listener from the bus. If only the event code or group is provided all the
+     * Removes an event listener from the bus. If only the event code or group is provided all the
      * handlers attached to that event or group will be removed.
      * 
      * @param eventGroup 
@@ -80,7 +51,7 @@ namespace events {
      * @param handler 
      * @return bool 
      */
-    bool EventBus::off (int eventGroup, int eventCode, void (*handler)(Event*))
+    bool EventBus::off (int eventGroup, int eventCode, EventHandler *handler)
     {
         eventGroup = EVTGRP(eventGroup);
         eventCode &= ASR_EVENT_CODE_MASK;
@@ -91,47 +62,39 @@ namespace events {
         {
             for (int j = 0; j < ASR_MAX_EVENT_CODES; j++)
             {
-                List<EventListener*> *list = this->listeners[j];
-                if (list == nullptr) continue;
+                std::list<ptr<EventListener>>& list = listeners[j];
 
-                Linkable<EventListener*> *ni = nullptr;
-
-                for (Linkable<EventListener*> *i = list->head(); i != nullptr; i = ni)
+                for (std::list<ptr<EventListener>>::iterator i = list.begin(); i != list.end(); i++)
                 {
                     bool k = true;
-                    ni = i->next();
 
                     if (handler != nullptr)
-                        k = k && i->value->handler == handler;
+                        k = k && (*i)->handler == handler;
 
                     if (eventGroup != 0)
-                        k = k && i->value->eventGroup == eventGroup;
+                        k = k && (*i)->eventGroup == eventGroup;
 
                     if (k == true)
-                        delete list->remove(i);
+                        list.erase(i);
                 }
             }
         }
         else
         {
-            List<EventListener*> *list = this->listeners[eventCode];
-            if (list == nullptr) return true;
+            std::list<ptr<EventListener>>& list = listeners[eventCode];
 
-            Linkable<EventListener*> *ni = nullptr;
-
-            for (Linkable<EventListener*> *i = list->head(); i != nullptr; i = ni)
+            for (std::list<ptr<EventListener>>::iterator i = list.begin(); i != list.end(); i++)
             {
                 bool k = true;
-                ni = i->next();
 
                 if (handler != nullptr)
-                    k = k && i->value->handler == handler;
+                    k = k && (*i)->handler == handler;
 
                 if (eventGroup != 0)
-                    k = k && i->value->eventGroup == eventGroup;
+                    k = k && (*i)->eventGroup == eventGroup;
 
                 if (k == true)
-                    delete list->remove(i);
+                    list.erase(i);
             }
         }
 
@@ -140,7 +103,7 @@ namespace events {
 
 
     /**
-     * @brief Silences or unsilences all handlers attached to an event. If the event fires, silenced handler
+     * Silences or unsilences all handlers attached to an event. If the event fires, silenced handler
      * will not be called.
      * 
      * @param eventGroup 
@@ -161,35 +124,33 @@ namespace events {
         {
             for (int j = 0; j < ASR_MAX_EVENT_CODES; j++)
             {
-                List<EventListener*> *list = this->listeners[j];
-                if (list == nullptr) continue;
+                std::list<ptr<EventListener>>& list = this->listeners[j];
 
-                for (Linkable<EventListener*> *i = list->head(); i != nullptr; i = i->next())
+                for (std::list<ptr<EventListener>>::iterator i = list.begin(); i != list.end(); i++)
                 {
                     bool k = true;
 
                     if (eventGroup != 0)
-                        k = k && i->value->eventGroup == eventGroup;
+                        k = k && (*i)->eventGroup == eventGroup;
 
                     if (k == true)
-                        i->value->silent += silent;
+                        (*i)->silent += silent;
                 }
             }
         }
         else
         {
-            List<EventListener*> *list = this->listeners[eventCode];
-            if (list == nullptr) return true;
+            std::list<ptr<EventListener>>& list = this->listeners[eventCode];
 
-            for (Linkable<EventListener*> *i = list->head(); i != nullptr; i = i->next())
+            for (std::list<ptr<EventListener>>::iterator i = list.begin(); i != list.end(); i++)
             {
                 bool k = true;
 
                 if (eventGroup != 0)
-                    k = k && i->value->eventGroup == eventGroup;
+                    k = k && (*i)->eventGroup == eventGroup;
 
                 if (k == true)
-                    i->value->silent += silent;
+                    (*i)->silent += silent;
             }
         }
 
@@ -198,87 +159,76 @@ namespace events {
 
 
     /**
-     * @brief Prepares an event for its later use. The event is started by calling the `resume` method. Note that
+     * Prepares an event for its later use. The event is started by calling the `resume` method. Note that
      * NULL is returned if there is an error with the eventCode or if there are no listeners for the event.
      * 
      * @param event 
-     * @return Event* 
+     * @return bool
      */
-    Event *EventBus::prepare (Event *event)
+    bool EventBus::prepare (ptr<Event> &event)
     {
         int eventGroup = event->eventCode & ASR_EVENT_GRP_MASK;
         int eventCode = event->eventCode & ASR_EVENT_CODE_MASK;
         if (eventCode < 1 || eventCode >= ASR_MAX_EVENT_CODES)
-            return nullptr;
+            return false;
 
-        List<EventListener*> *list = new List<EventListener*> ();
+        std::list<ptr<EventListener>> list;
 
-        if (this->listeners[eventCode] != nullptr)
+        for (std::list<ptr<EventListener>>::iterator i = this->listeners[eventCode].begin(); i != this->listeners[eventCode].end(); i++)
         {
-            for (Linkable<EventListener*> *i = this->listeners[eventCode]->head(); i; i = i->next())
-            {
-                if (i->value->silent > 0 || (eventGroup != 0 && i->value->eventGroup != eventGroup))
-                    continue;
+            if ((*i)->silent > 0 || (eventGroup != 0 && (*i)->eventGroup != eventGroup))
+                continue;
 
-                list->push(i->value);
-            }
+            list.push_back(*i);
         }
 
-        if (this->listeners[0] != nullptr)
+        for (std::list<ptr<EventListener>>::iterator i = this->listeners[0].begin(); i != this->listeners[0].end(); i++)
         {
-            for (Linkable<EventListener*> *i = this->listeners[0]->head(); i; i = i->next())
-            {
-                if (i->value->silent > 0 || (eventGroup != 0 && i->value->eventGroup != eventGroup))
-                    continue;
+            if ((*i)->silent > 0 || (eventGroup != 0 && (*i)->eventGroup != eventGroup))
+                continue;
 
-                list->push(i->value);
-            }
+            list.push_back(*i);
         }
 
-        if (list->length() == 0) {
-            delete list;
-            return nullptr;
-        }
+        if (list.size() == 0)
+            return false;
 
-        event->reset(list);
-        return event;
+        event->prepare(this, std::move(list));
+        return true;
     }
 
 
     /**
-     * @brief Dispatches an event to the respective listeners.
+     * Dispatches an event to the respective listeners.
      * @param event 
      */
-    void EventBus::dispatch (Event *event)
+    void EventBus::dispatch (ptr<Event> event)
     {
-        Event *evt = this->prepare(event);
-        if (evt == nullptr) return;
-        evt->resume()->destroy();
+        if (prepare(event))
+            event->resume();
     }
 
-
     /**
-     * @brief Adds an event to the event bus's queue. Delayed events are dispatched by calling `dispatch`. If there
-     * is no matching listener for the desired event no handler will be enqueued.
+     * Adds an event to the event bus's queue. Delayed events are dispatched by calling `dispatch`. If there
+     * is no matching listener for the desired event no handler will be queued.
      * 
      * @param event 
      */
-    void EventBus::enqueue (Event *event)
+    void EventBus::enqueue (ptr<Event> event)
     {
-        Event *evt = this->prepare(event);
-        if (evt == nullptr) return;
-        this->queue->push(evt);
+        if (prepare(event))
+            queue.push_back(event);
     }
 
-
     /**
-     * @brief Dispatches all the delayed events added to the event bus's queue by using `enqueue`.
+     * Dispatches all the delayed events added to the event bus.
      */
     void EventBus::dispatch()
     {
-        Event *evt;
-        while ((evt = this->queue->shift()) != nullptr) {
-            evt->resume()->destroy();
+        while (queue.size() != 0) {
+            ptr<Event> evt = queue.front();
+            queue.pop_front();
+            evt->resume();
         }
     }
 

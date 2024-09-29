@@ -359,12 +359,15 @@ int main (int argc, const char *argv[])
         Channel *channel = Channel::connect (new ClientHandler(), "127.0.0.1", 1000);
     }
 
-    struct : IUpdate {
+    struct : IUpdate
+    {
         time_t lastTime = 0;
-        void update (time_t time) {
+        void update (time_t time)
+        {
             if (lastTime == 0) lastTime = time - 5000;
             time_t delta = time - lastTime;
             if (delta < 5000) return;
+
             lastTime = time;
             printf(GREY "[MEM] blocks=%u, size=%.1f KB, peak=%.1f KB, channels=%u, handled=%u\n" DEF, 
                 asr::memblocks, 
@@ -374,7 +377,8 @@ int main (int argc, const char *argv[])
                 manager->totalChannels()
             );
         }
-    } mem_reporter;
+    }
+    mem_reporter;
 
     manager->main(&mem_reporter);
     return 0;

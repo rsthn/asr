@@ -5,12 +5,12 @@
 #ifndef __ASR_ERRORS_ERROR_H
 #define __ASR_ERRORS_ERROR_H
 
-#include <asr/utils/String>
+#include <string>
 
 namespace asr {
 namespace errors {
 
-    using asr::utils::String;
+    using std::string;
 
     /**
      * @brief Describes an error.
@@ -22,8 +22,7 @@ namespace errors {
         /**
          * @brief Error message.
          */
-        const char *_message;
-        String *_string;
+        string _message;
 
         /**
          * @brief Error code.
@@ -35,26 +34,24 @@ namespace errors {
         /**
          * @brief Creates an error with the specified message and (optional) error code.
          */
-        Error (const char *message, int code=0) : _message(message), _string(nullptr), _code(code)
+        Error (const char *message, int code=0) : _message(message), _code(code)
         { }
 
         /**
          * @brief Creates an error from a String object. The provided string will be deleted by the destructor.
          */
-        Error (String *string, int code=0) : _message(nullptr), _string(string), _code(code)
+        Error (string& message, int code=0) : _message(message), _code(code)
         { }
 
         /**
          * @brief Error only with an error code.
          */
-        Error (int code) : _message(nullptr), _string(nullptr), _code(code)
+        Error (int code) : _code(code)
         { }
 
         /**
          */
         virtual ~Error() {
-            if (_string != nullptr)
-                delete _string;
         }
 
         /**
@@ -62,7 +59,7 @@ namespace errors {
          * @return const char* 
          */
         virtual const char *message() const {
-            return _string != nullptr ? _string->c_str() : _message;
+            return _message.c_str();
         }
 
         /**
