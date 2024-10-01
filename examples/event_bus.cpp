@@ -1,18 +1,26 @@
 #include <string>
 #include <iostream>
 
-#include <asr/events/EventBus>
-#include <asr/events/Event>
+#include <asr/event-bus>
 
-using namespace asr::events;
+using namespace asr;
 using namespace std;
 
-const int EventA = ALLOCEVTCODE();
-const int EventB = ALLOCEVTCODE();
-const int GroupA = 1;
-const int GroupB = 2;
-const int GroupC = 3;
 
+/**
+ * Allocate event codes and groups.
+ */
+const int EventA = EventBus::getCode("EventA");
+const int EventB = EventBus::getCode("EventB");
+
+const int GroupA = EventBus::getGroup("GroupA");
+const int GroupB = EventBus::getGroup("GroupB");
+const int GroupC = EventBus::getGroup("GroupC");
+
+
+/**
+ * Custom event.
+ */
 class EventX : public Event
 {
     public:
@@ -20,39 +28,27 @@ class EventX : public Event
     static int code;
     string value;
 
-    EventX() : Event(EventX::code), value("dummy")
-    { }
-
-    EventX(const char *value) : Event(EventX::code), value(value)
-    { }
-
-    EventX& setValue (string& other_value) {
-        value = other_value;
-        return *this;
-    }
+    EventX() : Event(EventX::code), value("dummy") { }
+    EventX(const char *value) : Event(EventX::code), value(value) { }
 
     void dump() {
-        printf("EventX: %s\n", value.c_str());
+        printf("  EventX: %s\n", value.c_str());
     }
 };
 
-int EventX::code = ALLOCEVTCODE();
+int EventX::code = EventBus::getCode("EventX");
 
+
+/**
+ * Test entry point.
+ */
 void test()
 {
     EventBus bus;
 
-    bus.on(EventA, [](Event* e) {
-        cout << "  EventA" << endl;
-    });
-
-    bus.on(EventB, [](Event* e) {
-        cout << "  EventB" << endl;
-    });
-
-    bus.on(EventX::code, [](Event* e) {
-        cout << "  " << dynamic_cast<EventX*>(e)->value << endl;
-    });
+    // Add listeners.
+    bus.on(EventA, [](Event* e) { cout << "  EventA" << endl; });
+    bus.on(EventB, [](Event* e) { cout << "  EventB" << endl; });
 
     bus.on(GroupA, EventA, [](Event* e) {
         cout << "  GroupA::EventA" << endl;
@@ -60,12 +56,16 @@ void test()
 
     bus.on(GroupB, EventA, [](Event* e) {
         cout << "  GroupB::EventA" << endl;
-        e->enqueue(new EventX("event_x from group_b"));
+        e->enqueue(new EventX("triggered from group_b"));
     });
 
     bus.on(GroupC, EventA, [](Event* e) {
         cout << "  GroupC::EventA" << endl;
-        e->enqueue(new EventX("event_x from group_c"));
+        e->enqueue(new EventX("triggered from group_c"));
+    });
+
+    bus.on(EventX::code, [](Event* e) {
+        dynamic_cast<EventX*>(e)->dump();
     });
 
     // Trigger EventA global.
@@ -89,6 +89,9 @@ void test()
     cout << "\n";
 }
 
+
+/**
+ */
 int main (int argc, const char *argv[])
 {
     auto n = asr::memblocks;

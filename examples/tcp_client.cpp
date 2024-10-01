@@ -1,44 +1,58 @@
+#include <iostream>
+#include <unistd.h>
 
-#include <cstdio>
-#include <cwchar>
+#include <asr/socket-addr-ipv4>
+#include <asr/socket-tcp>
 
-#include <asr/net/InAddr>
-#include <asr/net/Socket>
+using namespace asr;
+using namespace std;
 
-int main (int argc, const char *argv[])
+/**
+ */
+void test()
 {
-    asr::net::Socket *socket = new asr::net::Socket (SOCK_STREAM);
-    if (!socket->isValid()) {
-        wprintf(L"Error: Unable to allocate TCP socket.\n");
-        return 1;
+    SocketTCP socket;
+
+    cout << "Connecting ..." << endl;
+    if (!socket.connect(new SockAddrIPv4(1000, "127.0.0.1"))) {
+        cout << "Error: Unable to connect to port 1000" << endl;
+        return;
     }
 
-    wprintf(L"Connecting ...\n");
-    if (!socket->connect("127.0.0.1", 9999)) {
-        wprintf(L"Error: Unable to connect to server.\n");
-        return 1;
-    }
+    cout << "Connected to " << socket.remote << endl;
 
     char buffer[1024];
-    int n;
+    int n = 0;
 
-    while (socket->isAlive())
+    while (true)
     {
-        int m = socket->read(&buffer[n], 16, sizeof(buffer)-n-1);
-        if (m == 0) {
-            if (n > 0) {
-                buffer[n] = 0;
-                wprintf(L"RECV: %s\n", buffer);
-            }
+        while (!socket.is_readable());
 
-            n = 0;
-            break;
-        }
-        else {
+        int m = socket.read(&buffer[n], sizeof(buffer)-n-1);
+        if (m != 0) {
             n += m;
+            continue;
         }
+
+        buffer[n] = 0;
+        cout << "\e[94m" << buffer << "\e[0m";
+        break;
     }
 
-    wprintf(L"Connection closed.\n");
+    cout << "Closed" << endl;
+}
+
+/**
+ */
+int main (int argc, const char *argv[])
+{
+    auto n = asr::memblocks;
+
+    test();
+
+    asr::refs::shutdown();
+    if (asr::memblocks != n)
+        cout << "\e[31mMemory leak detected: \e[91m" << asr::memsize << " bytes\e[0m\n";
+
     return 0;
 }

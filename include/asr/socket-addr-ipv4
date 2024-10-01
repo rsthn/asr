@@ -1,0 +1,73 @@
+#ifndef __ASR_SOCKET_ADDR_IPV4_H
+#define __ASR_SOCKET_ADDR_IPV4_H
+
+#include <asr/socket-addr>
+
+namespace asr
+{
+    class SockAddrIPv4 : public SockAddr
+    {
+        private:
+
+        struct sockaddr_in *desc() const {
+            return (struct sockaddr_in *)&data;
+        }
+
+        public:
+
+        SockAddrIPv4();
+        virtual ~SockAddrIPv4() { }
+
+        SockAddrIPv4(int port, const char *ipv4=nullptr) : SockAddrIPv4() {
+            set_port(port);
+            set_address(ipv4);
+        }
+
+        void reset() override {
+            memset(&data, 0, length);
+            desc()->sin_family = AF_INET;
+        }
+
+        void dump(std::ostream& os) const override {
+            const char *addr = get_address();
+            os << (addr ? addr : "0.0.0.0") << ":" << get_port();
+        }
+
+        void set_port(int port) {
+            desc()->sin_port = ::htons(port);
+        }
+
+        int get_port() const {
+            return ::ntohs(desc()->sin_port);
+        }
+
+        void set_address(const char *ipv4)
+        {
+            auto d = desc();
+            if (ipv4 != nullptr) {
+                #if __WIN32__
+                    d->sin_addr.s_addr = ::inet_addr(ipv4);
+                #else
+                    ::inet_pton(AF_INET, ipv4, &d->sin_addr);
+                #endif
+            }
+            else
+                d->sin_addr.s_addr = INADDR_ANY;
+        }
+
+        const char *get_address() const {
+            return ::inet_ntoa(desc()->sin_addr);
+        }
+
+        void set_address_int(uint32_t addr) {
+            desc()->sin_addr.s_addr = ::htonl(addr);
+        }
+
+        uint32_t get_address_int() const {
+            return ::ntohl(desc()->sin_addr.s_addr);
+        }
+    };
+
+};
+
+#endif

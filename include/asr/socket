@@ -1,0 +1,95 @@
+#ifndef __ASR_SOCKET_H
+#define __ASR_SOCKET_H
+
+#include <asr/socket-addr>
+#include <asr/ptr>
+
+#ifndef SOCKET
+#define SOCKET int
+#endif
+
+namespace asr
+{
+    class Socket
+    {
+        protected:
+
+        /**
+         * Indicates if the socket is connected.
+         */
+        bool connected;
+
+        public:
+
+        /**
+         * Actual resource assigned by the operating system.
+         */
+        SOCKET socket;
+
+        /**
+         */
+        Socket(int family, int type, SOCKET source);
+        virtual ~Socket();
+
+        /**
+         * Returns `true` if the socket is a valid socket number.
+         * @return bool
+         */
+        bool is_valid() const {
+            return socket != -1;
+        }
+
+        /**
+         * Forces invalidation of the socket number to avoid shutting down and closing it when the object is destroyed.
+         */
+        void invalidate() {
+            socket = -1;
+        }
+
+        /**
+         * Closes the socket and shuts down the communication channel if the socket is active.
+         */
+        void close();
+
+        /**
+         * Tests if the socket is readable.
+         * @param timeout Time to wait before returning (milliseconds).
+         * @return bool
+         */
+        bool is_readable(int timeout=150) const;
+
+        /**
+         * Tests if the socket is writeable.
+         * @param timeout Time to wait before returning (milliseconds).
+         * @return bool
+         */
+        bool is_writeable(int timeout=150) const;
+
+        /**
+         * Returns the SO_ERROR value of the socket.
+         * @return int
+         */
+        int get_error() const;
+
+        /**
+         * Sets the SO_REUSEADDR socket option.
+         * @param value 
+         */
+        void set_reuse_addr(bool value);
+
+        /**
+         * Sets the SO_BROADCAST socket option.
+         * @param value 
+         */
+        void set_broadcast(bool value);
+
+        /**
+         * Sets the non-blocking socket option.
+         * @param value 
+         */
+        void set_nonblocking(bool value);
+    };
+
+};
+
+#endif

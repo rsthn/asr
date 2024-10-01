@@ -1,34 +1,60 @@
-#include <cstdio>
-#include <cwchar>
+#include <iostream>
 #include <unistd.h>
 
-#include <asr/net/InAddr>
-#include <asr/net/Socket>
+#include <asr/socket-addr-ipv4>
+#include <asr/socket-tcp>
 
+using namespace asr;
+using namespace std;
+
+bool stop = false;
+
+/**
+ */
+void test()
+{
+    SocketTCP socket;
+    if (!socket.bind(new SockAddrIPv4(1000))) {
+        cout << "Error: Unable to bind socket to port 1000" << endl;
+        return;
+    }
+
+    if (!socket.is_valid()) {
+        cout << "Error: Socket number is invalid" << endl;
+        return;
+    }
+
+    cout << "\e[32m[Listening on " << socket.local << "]\e[0m" << endl;
+
+    signal(SIGINT, [](int) {
+        stop = true;
+    });
+
+    while (socket.listen() && !stop)
+    {
+        auto conn = socket.accept();
+        if (!conn) continue;
+
+        cout << "Connected to " << conn->remote << endl;
+        conn->write("Hello! from a simple and lightweight TCP server.\n");
+        usleep(1e3);
+        cout << "Closed" << endl;
+    }
+
+    cout << "\e[32m[Exiting]\e[0m" << endl;
+}
+
+/**
+ */
 int main (int argc, const char *argv[])
 {
-    asr::net::Socket *socket = new asr::net::Socket (SOCK_STREAM);
-    if (!socket->isValid()) {
-        wprintf(L"Error: Unable to allocate TCP socket.\n");
-        return 1;
-    }
+    auto n = asr::memblocks;
 
-    if (!socket->bind(9999)) {
-        wprintf(L"Error: Unable to bind socket to port 9999.\n");
-        return 1;
-    }
+    test();
 
-    wprintf(L"Listening on port 9999 ...\n");
-    while (socket->listen()) {
-        asr::net::Socket *conn = socket->accept();
-        wprintf(L"\nConnecting received from: %s\n", conn->remote->getAddrStr());
-
-        wprintf(L"Sending data ...\n");
-        conn->write("Hello! from a simple and tiny TCP server.\n");
-        usleep(2e6);
-        wprintf(L"Closing connection.\n");
-        delete conn;
-    }
+    asr::refs::shutdown();
+    if (asr::memblocks != n)
+        cout << "\e[31mMemory leak detected: \e[91m" << asr::memsize << " bytes\e[0m\n";
 
     return 0;
 }

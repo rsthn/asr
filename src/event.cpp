@@ -1,18 +1,16 @@
 
-#include <asr/events/EventBus>
-#include <asr/events/Event>
+#include <asr/event-bus>
+#include <asr/event>
 
 namespace asr {
-namespace events {
 
     /**
      * Resumes event propagation. Should be called if an event handler had previously called `wait`.
      */
     void Event::resume()
     {
-        isAsync = false;
-        while (!isAsync && curr != list.end())
-        {
+        is_async = false;
+        while (!is_async && curr != list.end()) {
             if (!(*curr)->silent) (*curr)->handler(this);
             curr++;
         }
@@ -37,4 +35,4 @@ namespace events {
         evt->next = event;
     }
 
-}};
+};

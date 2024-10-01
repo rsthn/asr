@@ -1,0 +1,85 @@
+#ifndef __ASR_SOCKET_TCP_H
+#define __ASR_SOCKET_TCP_H
+
+#include <asr/socket>
+
+namespace asr
+{
+    class SocketTCP : public Socket
+    {
+        public:
+
+        /**
+         * Local address the socket is currently bound to. Set after a call to `bind`.
+         */
+        ptr<SockAddr> local;
+
+        /**
+         * Address of the remote host the to which the socket is connected.
+         */
+        ptr<SockAddr> remote;
+
+        /**
+         * Creates a new TCP socket (SOCK_STREAM).
+         *
+         * @param source When provided it will be used instead of allocating a new socket resource.
+         */
+        SocketTCP(SOCKET source=-1);
+
+        /**
+         * Binds the socket to a port and optional address.
+         *
+         * @param addr Address to bind to.
+         * @return bool
+         */
+        bool bind(ptr<SockAddr> addr);
+
+        /**
+         * Starts listening for incoming connections. Returns `true` if a connection is established or `false` on failure.
+         *
+         * @param backlog Number of pending connections that can be queued.
+         * @return bool
+         */
+        bool listen(int backlog=128);
+
+        /**
+         * After `listen` returns `true`, a connection will be waiting to be accepted, by calling this method the
+         * connection will be granted and a new socket will be returned for further communication.
+         *
+         * @return ptr<SocketTCP>
+         */
+        ptr<SocketTCP> accept();
+
+        /**
+         * Attempts to connect to a remote server. Returns `false` on errors.
+         *
+         * @param address Address of the server.
+         * @param timeout Time to wait for the connection to be established (default is 5).
+         * @return bool
+         */
+        bool connect(ptr<SockAddr> addr, int timeout=5);
+
+        /**
+         * Writes the specified number of bytes from the buffer to the socket.
+         *
+         * @param buffer Buffer to read the data from.
+         * @param num_bytes Number of bytes to write. If not specified the length of the buffer (strlen) will be used.
+         * @return int
+         */
+        int write(const char *buffer, int num_bytes=-1);
+
+        /**
+         * Reads at most `num_bytes` from the socket into the given buffer and returns number of bytes read.
+         * Will return zero (0) if there was an error.
+         *
+         * @param buffer Buffer to read the data into.
+         * @param num_bytes Number of bytes to read.
+         * @param buffer_space Number of bytes available in the buffer. If not specified `num_bytes` will be used.
+         * @return int
+         */
+        int read(char *buffer, int num_bytes, int buffer_space=-1);
+    };
+
+};
+
+#endif

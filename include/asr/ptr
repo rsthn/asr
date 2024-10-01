@@ -85,6 +85,11 @@ namespace asr
             return value != other;
         }
 
+        /**
+         */
+        operator T*() const {
+            return value;
+        }
     };
 };
 

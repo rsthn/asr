@@ -1,27 +1,13 @@
-#ifndef __ASR_EVENTS_EVENT_H
-#define __ASR_EVENTS_EVENT_H
+#ifndef __ASR_EVENT_H
+#define __ASR_EVENT_H
 
 #include <memory>
 #include <list>
 
 #include <asr/ptr>
 
-namespace asr {
-namespace events {
-
-    /**
-     * Maximum number of event types (and masks).
-     */
-    #define ASR_MAX_EVENT_CODES		256
-    #define ASR_EVENT_CODE_MASK		0x0000FF
-    #define ASR_EVENT_GRP_MASK		0xFFFF00
-
-    /**
-     * Converts an eventGroup:eventCode pair to a single 24-bit integer describing an event code.
-     */
-    #define EVTCODE(grp, code) ((((grp)<<8)&ASR_EVENT_GRP_MASK)|((code)&ASR_EVENT_CODE_MASK))
-    #define EVTGRP(grp) (((grp)<<8)&ASR_EVENT_GRP_MASK)
-
+namespace asr
+{
     // Forward declaration.
     class Event;
     class EventBus;
@@ -40,7 +26,7 @@ namespace events {
         /**
          * Event group (zero is the global group).
          */
-        int eventGroup;
+        int group_code;
 
         /**
          * Handler function.
@@ -50,10 +36,11 @@ namespace events {
         /**
          * Constructs the event listener.
          */
-        EventListener (int eventGroup, EventHandler *handler) : 
-            silent(0), eventGroup(eventGroup), handler(handler)
+        EventListener (int group_code, EventHandler *handler) : 
+            silent(0), group_code(group_code), handler(handler)
         { }
     };
+
 
     /**
      * Holds the information about a triggered event. It also provides support to allow asynchronous event
@@ -73,7 +60,7 @@ namespace events {
         /**
          * Indicates if the most recent event handler called wants to use async mode. Set by calling the `wait` method.
          */
-        bool isAsync;
+        bool is_async;
 
         /**
          * Queue of listeners to invoke.
@@ -99,31 +86,42 @@ namespace events {
             curr = this->list.begin();
         }
 
+
         public:
 
         /**
          * Code of the event.
          */
-        int eventCode;
+        int event_code;
+
+        /**
+         * Group of the event.
+         */
+        int group_code;
 
         /**
          * Time of the event in milliseconds.
          */
-        time_t eventTime;
+        time_t event_time;
 
         /**
          */
-        Event (int eventCode, int eventGroup=0, time_t eventTime=0)
-            : eventCode(EVTCODE(eventGroup, eventCode)), eventTime(eventTime)
+        Event (int event_code, int group_code=0, time_t event_time=0)
+            : event_code(event_code), group_code(group_code), event_time(event_time)
         {
-            isAsync = false;
+            is_async = false;
             next = nullptr;
         }
 
-        virtual ~Event() = default;
+        virtual ~Event()
+        { }
+
+        /**
+         * Remove copy and move constructors and assignment operators.
+         */
         Event(const Event&) = delete;
-        Event& operator=(const Event&) = delete;
         Event(Event&&) noexcept = delete;
+        Event& operator=(const Event&) = delete;
         Event& operator=(Event&&) noexcept = delete;
 
         /**
@@ -131,7 +129,7 @@ namespace events {
          * this method it should also call `resume` when all async operations are finished.
          */
         void wait() {
-            isAsync = true;
+            is_async = true;
         }
 
         /**
@@ -143,9 +141,9 @@ namespace events {
          * Adds the specified event to the bottom of this event chain.
          * @param event 
          */
-        void enqueue (ptr<Event> event);
+        void enqueue(ptr<Event> event);
     };
 
-}};
+};
 
 #endif

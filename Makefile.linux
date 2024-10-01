@@ -1,9 +1,8 @@
 LIB_DIR = lib
 OBJ_DIR = obj
 
-OBJS = obj/defs.o obj/ptr.o obj/EventBus.o obj/Event.o \
-	   obj/Buffer.o obj/FileInputStream.o obj/FileOutputStream.o obj/Stream.o \
-	   obj/InAddr.o obj/Socket.o obj/Channel.o obj/Manager.o
+OBJS = obj/defs.o obj/ptr.o obj/event-bus.o obj/event.o obj/net.o \
+	   obj/Buffer.o obj/FileInputStream.o obj/FileOutputStream.o obj/Stream.o
 
 EXAMPLES = examples/event_bus examples/references examples/udp_client examples/udp_server
 

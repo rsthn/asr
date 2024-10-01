@@ -10,7 +10,6 @@ using namespace std;
 class Being
 {
     public:
-
     string name;
     int birthyear;
 
@@ -25,14 +24,13 @@ class Being
 class Person : public Being
 {
     public:
-
-    Person(string name, int birthyear) : Being(name, birthyear)
-    { }
+    Person(string name, int birthyear) : Being(name, birthyear) { }
 
     void print() override {
         cout << "[Person] " << name << " " << birthyear << endl;
     }
 };
+
 
 vector<ptr<Being>> getList()
 {
@@ -40,18 +38,26 @@ vector<ptr<Being>> getList()
 
     ptr<Being> x = new Being("The Thing", 1982);
     ptr<Being> y = new Person("Jon", 1988);
-    auto dummy = ptr<Being>(new Person("Jane", 1993));
+    
+    auto dummy = ptr<Being>(new Person("Dummy1", 2000));
+    dummy = new Person("Dummy2", 2000);
 
     list.push_back(x);
     list.push_back(y);
     return list;
 }
 
-void test() {
+/**
+ * Test entry point.
+ */
+void test()
+{
     for (auto &item : getList())
         item->print();
 }
 
+/**
+ */
 int main (int argc, const char *argv[])
 {
     auto n = asr::memblocks;

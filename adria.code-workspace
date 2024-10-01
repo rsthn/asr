@@ -58,7 +58,10 @@
             "sstream": "cpp",
             "stdexcept": "cpp",
             "streambuf": "cpp",
-            "typeinfo": "cpp"
+            "typeinfo": "cpp",
+            "socket-addr": "cpp",
+            "ptr": "cpp",
+            "socket": "cpp"
         }
     }
 }
