@@ -1,8 +1,8 @@
 #ifndef __ASR_PTR_H
 #define __ASR_PTR_H
 
-#include <unordered_map>
 #include <asr/defs>
+#include <unordered_map>
 
 namespace asr
 {

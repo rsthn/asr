@@ -1,6 +1,7 @@
 
 #include <asr/socket-addr>
-#include <asr/socket-addr-ipv4>
+#include <asr/socket-addr-ip4>
+#include <asr/socket-addr-ip6>
 #include <asr/socket>
 #include <asr/socket-tcp>
 
@@ -27,19 +28,27 @@ namespace asr {
     #endif
 
     // Constructor added here instead of inline in the header file to ensure the Winsocks initialization is performed.
-    SockAddrIPv4::SockAddrIPv4() : SockAddr(sizeof(struct sockaddr_in)) {
+    SockAddrIP4::SockAddrIP4() : SockAddr(sizeof(struct sockaddr_in)) {
+        reset();
+    }
+
+    SockAddrIP6::SockAddrIP6() : SockAddr(sizeof(struct sockaddr_in6)) {
         reset();
     }
 
     /* *************************************/
     /* Socket */
 
-    Socket::Socket(int family, int type, SOCKET source) {
-        socket = source == -1 ? ::socket(family, type, 0) : source;
+    Socket::Socket(SOCKET source) : socket(source) {
     }
 
     Socket::~Socket() {
         close();
+    }
+
+    SOCKET Socket::alloc(int family, int type) {
+        socket = ::socket(family, type, 0);
+        return socket;
     }
 
     void Socket::close()
@@ -132,7 +141,7 @@ namespace asr {
     /* *************************************/
     /* SocketTCP */
 
-    SocketTCP::SocketTCP(SOCKET source) : Socket(AF_INET, SOCK_STREAM, source) {
+    SocketTCP::SocketTCP(SOCKET source) : Socket(source) {
         local = nullptr;
         remote = nullptr;
         connected = false;
@@ -140,14 +149,14 @@ namespace asr {
 
     bool SocketTCP::bind(ptr<SockAddr> addr)
     {
-        if (socket == -1)
+        if (socket == -1 && alloc(addr->get_family(), SOCK_STREAM) == -1)
             return false;
 
         local = addr;
-        if (::bind (socket, &addr->data, addr->length) == -1)
+        if (::bind(socket, &addr->data, addr->length) == -1)
             return false;
 
-        ::getsockname (socket, &addr->data, &addr->length);
+        ::getsockname(socket, &addr->data, &addr->length);
         return true;
     }
 
@@ -166,7 +175,7 @@ namespace asr {
     {
         if (socket == -1) return nullptr;
 
-        ptr<SockAddr> remote = new SockAddrIPv4();
+        ptr<SockAddr> remote = local->alloc();
         int nsocket = ::accept(socket, &remote->data, &remote->length);
         if (nsocket == -1) return nullptr;
 
@@ -182,7 +191,9 @@ namespace asr {
         fd_set tmpset; 
 
         connected = false;
-        if (socket == -1) return false;
+
+        if (socket == -1 && alloc(addr->get_family(), SOCK_STREAM) == -1)
+            return false;
 
         remote = addr;
         set_nonblocking(true);
@@ -198,13 +209,13 @@ namespace asr {
                     return false;
             #endif
 
-            tv.tv_sec = timeout;
+            tv.tv_sec = 10;
             tv.tv_usec = 0;
 
             FD_ZERO(&tmpset); 
             FD_SET(socket, &tmpset);
-            if (::select(socket+1, nullptr, &tmpset, nullptr, &tv) > 0)
-            {
+
+            if (::select(socket+1, nullptr, &tmpset, nullptr, &tv) > 0) {
                 if (!get_error())
                     return connected = true;
             }

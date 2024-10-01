@@ -1,8 +1,8 @@
+#include <asr/socket-addr-ip6>
+#include <asr/socket-addr-ip4>
+#include <asr/socket-tcp>
 #include <iostream>
 #include <unistd.h>
-
-#include <asr/socket-addr-ipv4>
-#include <asr/socket-tcp>
 
 using namespace asr;
 using namespace std;
@@ -14,7 +14,7 @@ void test()
     SocketTCP socket;
 
     cout << "Connecting ..." << endl;
-    if (!socket.connect(new SockAddrIPv4(1000, "127.0.0.1"))) {
+    if (!socket.connect(new SockAddrIP4(1000, "127.0.0.1"))) {
         cout << "Error: Unable to connect to port 1000" << endl;
         return;
     }

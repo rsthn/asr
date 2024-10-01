@@ -19,6 +19,15 @@ namespace asr
          */
         bool connected;
 
+        protected:
+
+        /**
+         * Allocates a new socket.
+         * @param family 
+         * @param type 
+         */
+        SOCKET alloc(int family, int type);
+
         public:
 
         /**
@@ -28,7 +37,7 @@ namespace asr
 
         /**
          */
-        Socket(int family, int type, SOCKET source);
+        Socket(SOCKET source=-1);
         virtual ~Socket();
 
         /**

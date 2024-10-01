@@ -4,7 +4,7 @@ OBJ_DIR = obj
 OBJS = obj/defs.o obj/ptr.o obj/event-bus.o obj/event.o obj/net.o \
 	   obj/Buffer.o obj/FileInputStream.o obj/FileOutputStream.o obj/Stream.o
 
-EXAMPLES = examples/event_bus.exe examples/references.exe examples/udp_client.exe examples/udp_server.exe
+EXAMPLES = examples/event_bus.exe examples/refs.exe examples/udp_client.exe examples/udp_server.exe
 
 CC = clang++
 CCFLAGS = -Qunused-arguments -Wno-format-security -fcolor-diagnostics -fansi-escape-codes -Wno-format -std=c++17 \
@@ -18,7 +18,7 @@ obj/%.o: %.cpp
 
 examples/%.exe: %.cpp
 	@echo [90m - [96m$<[0m
-	@$(CC) $(CCFLAGS) $< -o $@ -lasr -lwsock32
+	@$(CC) $(CCFLAGS) $< -o $@ -lasr -lws2_32
 
 build: lib
 all: uninstall clean lib
@@ -68,7 +68,9 @@ examples: msg-2 $(EXAMPLES)
 # Build and run examples
 event_bus: examples/event_bus.exe
 	@$<
-references: examples/references.exe
+test: examples/test.exe
+	@$<
+refs: examples/refs.exe
 	@$<
 udp_server: examples/udp_server.exe
 	@$<

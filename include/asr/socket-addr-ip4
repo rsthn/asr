@@ -1,11 +1,11 @@
-#ifndef __ASR_SOCKET_ADDR_IPV4_H
-#define __ASR_SOCKET_ADDR_IPV4_H
+#ifndef __ASR_SOCKET_ADDR_IP4_H
+#define __ASR_SOCKET_ADDR_IP4_H
 
 #include <asr/socket-addr>
 
 namespace asr
 {
-    class SockAddrIPv4 : public SockAddr
+    class SockAddrIP4 : public SockAddr
     {
         private:
 
@@ -15,12 +15,16 @@ namespace asr
 
         public:
 
-        SockAddrIPv4();
-        virtual ~SockAddrIPv4() { }
+        SockAddrIP4();
+        virtual ~SockAddrIP4() { }
 
-        SockAddrIPv4(int port, const char *ipv4=nullptr) : SockAddrIPv4() {
+        SockAddrIP4(int port, const char *ip4=nullptr) : SockAddrIP4() {
             set_port(port);
-            set_address(ipv4);
+            set_address(ip4);
+        }
+
+        SockAddr *alloc() const override {
+            return new SockAddrIP4();
         }
 
         void reset() override {
@@ -41,16 +45,11 @@ namespace asr
             return ::ntohs(desc()->sin_port);
         }
 
-        void set_address(const char *ipv4)
+        void set_address(const char *ip4)
         {
             auto d = desc();
-            if (ipv4 != nullptr) {
-                #if __WIN32__
-                    d->sin_addr.s_addr = ::inet_addr(ipv4);
-                #else
-                    ::inet_pton(AF_INET, ipv4, &d->sin_addr);
-                #endif
-            }
+            if (ip4 != nullptr)
+                ::inet_pton(AF_INET, ip4, &d->sin_addr);
             else
                 d->sin_addr.s_addr = INADDR_ANY;
         }

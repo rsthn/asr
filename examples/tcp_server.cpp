@@ -1,8 +1,8 @@
+#include <asr/socket-addr-ip6>
+#include <asr/socket-addr-ip4>
+#include <asr/socket-tcp>
 #include <iostream>
 #include <unistd.h>
-
-#include <asr/socket-addr-ipv4>
-#include <asr/socket-tcp>
 
 using namespace asr;
 using namespace std;
@@ -14,7 +14,7 @@ bool stop = false;
 void test()
 {
     SocketTCP socket;
-    if (!socket.bind(new SockAddrIPv4(1000))) {
+    if (!socket.bind(new SockAddrIP4(1000))) {
         cout << "Error: Unable to bind socket to port 1000" << endl;
         return;
     }

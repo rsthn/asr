@@ -1,6 +1,12 @@
 #ifndef __ASR_DEFS_H
 #define __ASR_DEFS_H
 
+#if __WIN32__
+    // Windows Vista and later
+    #define WINVER 0x0600
+    #define _WIN32_WINNT 0x0600
+#endif
+
 /**
  * When AST_TRACK_MEMORY is defined as 1, the memory allocation functions will be tracked and checked
  * for errors and leaks. This is useful for debugging purposes.
@@ -15,6 +21,8 @@
 #include <cstdio>
 #include <cassert>
 #include <ctime>
+
+#include <asr/ptr>
 
 /**
  * Global definition of standard types.

@@ -1,10 +1,10 @@
 #ifndef __ASR_EVENT_H
 #define __ASR_EVENT_H
 
+#include <asr/ptr>
+
 #include <memory>
 #include <list>
-
-#include <asr/ptr>
 
 namespace asr
 {

@@ -1,12 +1,12 @@
 #ifndef __ASR_EVENTBUS_H
 #define __ASR_EVENTBUS_H
 
+#include <asr/event>
+#include <asr/ptr>
+
 #include <unordered_map>
 #include <list>
 #include <string>
-
-#include <asr/event>
-#include <asr/ptr>
 
 namespace asr
 {

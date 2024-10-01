@@ -4,7 +4,7 @@ OBJ_DIR = obj
 OBJS = obj/defs.o obj/ptr.o obj/event-bus.o obj/event.o obj/net.o \
 	   obj/Buffer.o obj/FileInputStream.o obj/FileOutputStream.o obj/Stream.o
 
-EXAMPLES = examples/event_bus examples/references examples/udp_client examples/udp_server
+EXAMPLES = examples/event_bus examples/refs examples/udp_client examples/udp_server
 
 CC = clang++
 CCFLAGS = -Qunused-arguments -Wno-format-security -fcolor-diagnostics -fansi-escape-codes -Wno-format -std=c++17 \
@@ -51,7 +51,7 @@ examples: msg-2 $(EXAMPLES)
 # Build and run examples
 event_bus: examples/event_bus
 	@$<
-references: examples/references
+refs: examples/refs
 	@$<
 udp_server: examples/udp_server
 	@$<

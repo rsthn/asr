@@ -1,15 +1,15 @@
+#include <asr/defs>
+
 #ifdef _WIN32
 #include <windows.h>
 #endif
 
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <string.h>
-#include <wchar.h>
-
+#include <cstdlib>
+#include <cstdarg>
+#include <cstdio>
+#include <cstring>
+#include <cwchar>
 #include <chrono>
-#include <asr/defs>
 
 namespace asr
 {

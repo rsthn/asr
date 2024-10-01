@@ -34,6 +34,12 @@ namespace asr
         virtual ~SockAddr() { }
         virtual void reset() { }
 
+        int get_family() {
+            return data.sa_family;
+        }
+
+        virtual SockAddr *alloc() const = 0;
+
         virtual void dump(std::ostream& os) const = 0;
 
         friend std::ostream& operator<<(std::ostream& os, const SockAddr *addr) {
