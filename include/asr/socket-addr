@@ -3,6 +3,7 @@
 
 #include <asr/defs>
 #include <ostream>
+#include <cstring>
 
 #if __WIN32__
     #include <winsock2.h>
@@ -25,10 +26,10 @@ namespace asr
     {
         public:
 
-        int length;
+        socklen_t length;
         struct sockaddr data;
 
-        SockAddr(int length) : length(length)
+        SockAddr(socklen_t length) : length(length)
         { }
 
         virtual ~SockAddr() { }

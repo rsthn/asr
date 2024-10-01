@@ -14,8 +14,8 @@ void test()
     SocketTCP socket;
 
     cout << "Connecting ..." << endl;
-    if (!socket.connect(new SockAddrIP4(1000, "127.0.0.1"))) {
-        cout << "Error: Unable to connect to port 1000" << endl;
+    if (!socket.connect(new SockAddrIP4(2000, "127.0.0.1"))) {
+        cout << "Error: Unable to connect to port 2000" << endl;
         return;
     }
 
