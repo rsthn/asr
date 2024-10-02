@@ -1,34 +1,69 @@
-#include <cstdio>
-#include <cwchar>
+#include <asr/socket-addr-ip6>
+#include <asr/socket-addr-ip4>
+#include <asr/socket-udp>
+#include <csignal>
+#include <iostream>
+#include <unistd.h>
 
-#include <asr/net/InAddr>
-#include <asr/net/Socket>
+using namespace asr;
+using namespace std;
+
+bool stop = false;
 
 /**
- * @brief Runs a test server that listens for UDP packets on port 9999.
+ */
+void test()
+{
+    SocketUDP socket;
+    if (!socket.bind(new SockAddrIP4(2000))) {
+        cout << "Error: Unable to bind socket to port 2000" << endl;
+        return;
+    }
+
+    if (!socket.is_valid()) {
+        cout << "Error: Socket number is invalid" << endl;
+        return;
+    }
+
+    cout << "\e[32m[Waiting on " << socket.local << "]\e[0m" << endl;
+
+    signal(SIGINT, [](int) {
+        stop = true;
+    });
+
+    socket.set_nonblocking(true);
+
+    char buffer[1024];
+    while (!stop)
+    {
+        buffer[socket.read(buffer, sizeof(buffer)-1)] = 0;
+        if (!buffer[0]) {
+            usleep(1000);
+            continue;
+        }
+
+        cout << "\e[90m" << socket.remote << "\e[0m: " << buffer << endl;
+
+        if (strcmp(buffer, "stop"))
+            strcat(buffer, " - ACK");
+
+        socket.write(buffer);
+    }
+
+    cout << "\e[32m[Exiting]\e[0m" << endl;
+}
+
+/**
  */
 int main (int argc, const char *argv[])
 {
-    asr::net::Socket *socket = new asr::net::Socket (SOCK_DGRAM);
-    if (!socket->isValid()) {
-        wprintf(L"Error: Unable to allocate UDP socket.");
-        return 1;
-    }
+    auto n = asr::memblocks;
 
-    if (!socket->bind(9999)) {
-        wprintf(L"Error: Unable to bind socket to port 9999.");
-        return 1;
-    }
+    test();
 
-    wprintf(L"Waiting for data in port 9999 ...\n");
-    while (true) {
-        char buffer[1024];
-        int bytes = socket->read(buffer, sizeof(buffer)-1);
-        buffer[bytes] = '\0';
-
-        wprintf(L"\nRead: %d bytes from %s\nData: ", bytes, socket->remote->getAddrStr());
-        wprintf(L"%s\n", buffer);
-    }
+    asr::refs::shutdown();
+    if (asr::memblocks != n)
+        cout << "\e[31mMemory leak detected: \e[91m" << asr::memsize << " bytes\e[0m\n";
 
     return 0;
 }

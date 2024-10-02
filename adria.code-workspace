@@ -62,7 +62,8 @@
             "socket-addr": "cpp",
             "ptr": "cpp",
             "socket": "cpp",
-            "socket-addr-ipv6": "cpp"
+            "socket-addr-ipv6": "cpp",
+            "socket-udp": "cpp"
         }
     }
 }

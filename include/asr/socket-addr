@@ -39,6 +39,11 @@ namespace asr
             return data.sa_family;
         }
 
+        void set (const SockAddr *other) {
+            std::memcpy(&data, &other->data, sizeof(data));
+            length = other->length;
+        }
+
         virtual SockAddr *alloc() const = 0;
 
         virtual void dump(std::ostream& os) const = 0;

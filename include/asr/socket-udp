@@ -1,11 +1,11 @@
-#ifndef __ASR_SOCKET_TCP_H
-#define __ASR_SOCKET_TCP_H
+#ifndef __ASR_SOCKET_UDP_H
+#define __ASR_SOCKET_UDP_H
 
 #include <asr/socket>
 
 namespace asr
 {
-    class SocketTCP : public Socket
+    class SocketUDP : public Socket
     {
         public:
 
@@ -15,23 +15,23 @@ namespace asr
         ptr<SockAddr> local;
 
         /**
-         * Address of the remote host the to which the socket is connected.
+         * Address of the remote host to receive/send data.
          */
         ptr<SockAddr> remote;
 
         /**
-         * Creates a new TCP socket (SOCK_STREAM).
+         * Creates a new UDP socket (SOCK_DGRAM).
          *
          * @param source When provided it will be used instead of allocating a new socket resource.
          */
-        SocketTCP(SOCKET source=-1);
+        SocketUDP(SOCKET source=-1);
 
         /**
-         * Creates a new TCP socket (SOCK_STREAM) and binds it to the specified address.
+         * Creates a new UDP socket (SOCK_DGRAM) and binds it to the specified address.
          *
          * @param addr Address to bind to.
          */
-        SocketTCP(ptr<SockAddr> addr) : SocketTCP() {
+        SocketUDP(ptr<SockAddr> addr) : SocketUDP() {
             bind(addr);
         }
 
@@ -42,31 +42,6 @@ namespace asr
          * @return bool
          */
         bool bind(ptr<SockAddr> addr);
-
-        /**
-         * Starts listening for incoming connections. Returns `true` if a connection is established or `false` on failure.
-         *
-         * @param backlog Number of pending connections that can be queued.
-         * @return bool
-         */
-        bool listen(int backlog=128);
-
-        /**
-         * After `listen` returns `true`, a connection will be waiting to be accepted, by calling this method the
-         * connection will be granted and a new socket will be returned for further communication.
-         *
-         * @return ptr<SocketTCP>
-         */
-        ptr<SocketTCP> accept();
-
-        /**
-         * Attempts to connect to a remote server. Returns `false` on errors.
-         *
-         * @param address Address of the server.
-         * @param timeout Time to wait for the connection to be established (default is 5).
-         * @return bool
-         */
-        bool connect(ptr<SockAddr> addr, int timeout=5);
 
         /**
          * Writes the specified number of bytes from the buffer to the socket.

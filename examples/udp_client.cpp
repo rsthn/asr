@@ -1,27 +1,66 @@
+#include <asr/socket-addr-ip6>
+#include <asr/socket-addr-ip4>
+#include <asr/socket-udp>
+#include <iostream>
+#include <unistd.h>
 
-#include <cstdio>
-#include <cwchar>
-
-#include <asr/net/InAddr>
-#include <asr/net/Socket>
+using namespace asr;
+using namespace std;
 
 /**
- * @brief Connects to a UDP server on localhost:9999 and sends a plain text message.
+ */
+void test()
+{
+    SocketUDP socket;
+
+    if (!socket.bind(new SockAddrIP4())) {
+        cout << "Error: Unable to bind socket" << endl;
+        return;
+    }
+
+    socket.remote = new SockAddrIP4(2000, "127.0.0.1");
+    socket.write("Good day from a UDP client!");
+
+    char buffer[1024];
+
+    const char *messages[] = {
+        "Ping", "Hello", "Привет", "stop"
+    };
+
+    const int num_messages = sizeof(messages) / sizeof(messages[0]);
+    int next_message = 0;
+
+    while (true)
+    {
+        buffer[socket.read(buffer, sizeof(buffer)-1)] = 0;
+        if (!buffer[0]) {
+            usleep(1000);
+            continue;
+        }
+
+        cout << "\e[90m" << socket.remote << "\e[0m: " << buffer << endl;
+
+        if (!strcmp(buffer, "stop"))
+            break;
+
+        socket.write(messages[next_message]);
+        next_message = (next_message + 1) % num_messages;
+    }
+
+    cout << "Closed" << endl;
+}
+
+/**
  */
 int main (int argc, const char *argv[])
 {
-    asr::net::Socket *socket = new asr::net::Socket (SOCK_DGRAM);
-    if (!socket->isValid()) {
-        wprintf(L"Error: Unable to allocate UDP socket.");
-        return 1;
-    }
+    auto n = asr::memblocks;
 
-    socket->target = new asr::net::InAddr("127.0.0.1", 9999);
+    test();
 
-    if (argc == 2)
-        socket->write(argv[1]);
-    else
-        socket->write("Hello! This is a small test.\n");
+    asr::refs::shutdown();
+    if (asr::memblocks != n)
+        cout << "\e[31mMemory leak detected: \e[91m" << asr::memsize << " bytes\e[0m\n";
 
     return 0;
 }

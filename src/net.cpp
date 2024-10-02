@@ -2,8 +2,10 @@
 #include <asr/socket-addr>
 #include <asr/socket-addr-ip4>
 #include <asr/socket-addr-ip6>
+
 #include <asr/socket>
 #include <asr/socket-tcp>
+#include <asr/socket-udp>
 
 #include <iostream>
 
@@ -137,7 +139,6 @@ namespace asr {
     }
 
 
-
     /* *************************************/
     /* SocketTCP */
 
@@ -205,7 +206,7 @@ namespace asr {
                 if (WSAGetLastError() != WSAEWOULDBLOCK)
                     return false;
             #else
-                if (errno != EINPROGRESS)
+                if (errno != EINPROGRESS && errno != EWOULDBLOCK)
                     return false;
             #endif
 
@@ -228,15 +229,13 @@ namespace asr {
 
     int SocketTCP::read(char *buffer, int num_bytes, int buffer_space)
     {
-        if (socket == -1 /* || !is_alive(0) */)
+        if (socket == -1)
             return 0;
 
         if (buffer_space == -1)
             buffer_space = num_bytes;
 
         num_bytes = num_bytes > buffer_space ? buffer_space : num_bytes;
-        //if (type == SOCK_DGRAM)
-        //    n = ::recvfrom (socket, buffer, num_bytes, 0, (struct sockaddr *)&remote->descriptor, &remote->length);
         int n = ::recv(socket, buffer, num_bytes, 0);
         return n < 1 ? 0 : n;
     }
@@ -249,9 +248,57 @@ namespace asr {
         if (num_bytes == -1)
             num_bytes = ::strlen(buffer);
 
-        //if (type == SOCK_DGRAM)
-        //    n = ::sendto (this->socket, buffer, num_bytes, 0, (struct sockaddr *)&this->target->descriptor, this->target->length);
         int n = ::send(socket, buffer, num_bytes, 0);
+        return n < 1 ? 0 : n;
+    }
+
+
+    /* *************************************/
+    /* SocketUDP */
+
+    SocketUDP::SocketUDP(SOCKET source) : Socket(source) {
+        local = nullptr;
+        remote = nullptr;
+        connected = false;
+    }
+
+    bool SocketUDP::bind(ptr<SockAddr> addr)
+    {
+        if (socket == -1 && alloc(addr->get_family(), SOCK_DGRAM) == -1)
+            return false;
+
+        remote = addr->alloc();
+        local = addr;
+
+        if (::bind(socket, &addr->data, addr->length) == -1)
+            return false;
+
+        ::getsockname(socket, &addr->data, &addr->length);
+        return true;
+    }
+
+    int SocketUDP::read(char *buffer, int num_bytes, int buffer_space)
+    {
+        if (socket == -1)
+            return 0;
+
+        if (buffer_space == -1)
+            buffer_space = num_bytes;
+
+        num_bytes = num_bytes > buffer_space ? buffer_space : num_bytes;
+        int n = ::recvfrom(socket, buffer, num_bytes, 0, &remote->data, &remote->length);
+        return n < 1 ? 0 : n;
+    }
+
+    int SocketUDP::write(const char *buffer, int num_bytes)
+    {
+        if (socket == -1 || !is_writeable(0))
+            return 0;
+
+        if (num_bytes == -1)
+            num_bytes = ::strlen(buffer);
+
+        int n = ::sendto(socket, buffer, num_bytes, 0, &remote->data, remote->length);
         return n < 1 ? 0 : n;
     }
 
