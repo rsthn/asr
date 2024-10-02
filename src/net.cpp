@@ -29,15 +29,6 @@ namespace asr {
     static const int __wsaReady = initWinsocks();
     #endif
 
-    // Constructor added here instead of inline in the header file to ensure the Winsocks initialization is performed.
-    SockAddrIP4::SockAddrIP4() : SockAddr(sizeof(struct sockaddr_in)) {
-        reset();
-    }
-
-    SockAddrIP6::SockAddrIP6() : SockAddr(sizeof(struct sockaddr_in6)) {
-        reset();
-    }
-
     /* *************************************/
     /* Socket */
 
@@ -154,10 +145,10 @@ namespace asr {
             return false;
 
         local = addr;
-        if (::bind(socket, &addr->data, addr->length) == -1)
+        if (::bind(socket, addr->sockaddr(), addr->length) == -1)
             return false;
 
-        ::getsockname(socket, &addr->data, &addr->length);
+        ::getsockname(socket, addr->sockaddr(), &addr->length);
         return true;
     }
 
@@ -177,7 +168,7 @@ namespace asr {
         if (socket == -1) return nullptr;
 
         ptr<SockAddr> remote = local->alloc();
-        int nsocket = ::accept(socket, &remote->data, &remote->length);
+        int nsocket = ::accept(socket, remote->sockaddr(), &remote->length);
         if (nsocket == -1) return nullptr;
 
         SocketTCP *client = new SocketTCP(nsocket);
@@ -199,7 +190,7 @@ namespace asr {
         remote = addr;
         set_nonblocking(true);
 
-        int res = ::connect(socket, &remote->data, remote->length);
+        int res = ::connect(socket, remote->sockaddr(), remote->length);
         if (res < 0)
         {
             #if __WIN32__
@@ -270,10 +261,10 @@ namespace asr {
         remote = addr->alloc();
         local = addr;
 
-        if (::bind(socket, &addr->data, addr->length) == -1)
+        if (::bind(socket, addr->sockaddr(), addr->length) == -1)
             return false;
 
-        ::getsockname(socket, &addr->data, &addr->length);
+        ::getsockname(socket, addr->sockaddr(), &addr->length);
         return true;
     }
 
@@ -286,7 +277,7 @@ namespace asr {
             buffer_space = num_bytes;
 
         num_bytes = num_bytes > buffer_space ? buffer_space : num_bytes;
-        int n = ::recvfrom(socket, buffer, num_bytes, 0, &remote->data, &remote->length);
+        int n = ::recvfrom(socket, buffer, num_bytes, 0, remote->sockaddr(), &remote->length);
         return n < 1 ? 0 : n;
     }
 
@@ -298,7 +289,7 @@ namespace asr {
         if (num_bytes == -1)
             num_bytes = ::strlen(buffer);
 
-        int n = ::sendto(socket, buffer, num_bytes, 0, &remote->data, remote->length);
+        int n = ::sendto(socket, buffer, num_bytes, 0, remote->sockaddr(), remote->length);
         return n < 1 ? 0 : n;
     }
 

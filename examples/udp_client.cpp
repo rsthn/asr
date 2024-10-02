@@ -12,7 +12,6 @@ using namespace std;
 void test()
 {
     SocketUDP socket;
-
     if (!socket.bind(new SockAddrIP4())) {
         cout << "Error: Unable to bind socket" << endl;
         return;

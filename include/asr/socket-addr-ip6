@@ -15,7 +15,10 @@ namespace asr
 
         public:
 
-        SockAddrIP6();
+        SockAddrIP6() : SockAddr(sizeof(struct sockaddr_in6)) {
+            desc()->sin6_family = AF_INET6;
+        }
+
         virtual ~SockAddrIP6() { }
 
         SockAddrIP6(int port, const char *ip6=nullptr) : SockAddrIP6() {
@@ -25,11 +28,6 @@ namespace asr
 
         SockAddr *alloc() const override {
             return new SockAddrIP6();
-        }
-
-        void reset() override {
-            memset(&data, 0, length);
-            desc()->sin6_family = AF_INET6;
         }
 
         void dump(std::ostream& os) const override {
