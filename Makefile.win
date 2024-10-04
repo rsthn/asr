@@ -76,6 +76,8 @@ udp_server: examples/udp_server.exe
 	@$<
 udp_client: examples/udp_client.exe
 	@$<
+udp_broadcast: examples/udp_broadcast.exe
+	@$<
 tcp_server: examples/tcp_server.exe
 	@$<
 tcp_client: examples/tcp_client.exe

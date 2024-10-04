@@ -46,22 +46,32 @@ namespace asr
         /**
          * Writes the specified number of bytes from the buffer to the socket.
          *
+         * @param remote Remote address to send data to.
          * @param buffer Buffer to read the data from.
          * @param num_bytes Number of bytes to write. If not specified the length of the buffer (strlen) will be used.
          * @return int
          */
-        int write(const char *buffer, int num_bytes=-1);
+        int send(ptr<SockAddr> remote, const char *buffer, int num_bytes=-1);
+
+        int send(const char *buffer, int num_bytes=-1) {
+            return send(nullptr, buffer, num_bytes);
+        }
 
         /**
          * Reads at most `num_bytes` from the socket into the given buffer and returns number of bytes read.
          * Will return zero (0) if there was an error.
          *
+         * @param remote Remote address to store the address of the remote host.
          * @param buffer Buffer to read the data into.
          * @param num_bytes Number of bytes to read.
          * @param buffer_space Number of bytes available in the buffer. If not specified `num_bytes` will be used.
          * @return int
          */
-        int read(char *buffer, int num_bytes, int buffer_space=-1);
+        int recv(ptr<SockAddr> remote, char *buffer, int num_bytes, int buffer_space=-1);
+
+        int recv(char *buffer, int num_bytes, int buffer_space=-1) {
+            return recv(nullptr, buffer, num_bytes, buffer_space);
+        }
     };
 
 };

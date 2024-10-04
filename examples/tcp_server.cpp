@@ -37,7 +37,7 @@ void test()
         if (!conn) continue;
 
         cout << "Connected to " << conn->remote << endl;
-        conn->write("Hello! from a simple and lightweight TCP server.\n");
+        conn->send("Hello! from a simple and lightweight TCP server.\n");
         usleep(1e3);
         cout << "Closed" << endl;
     }

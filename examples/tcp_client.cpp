@@ -14,7 +14,7 @@ void test()
     SocketTCP socket;
 
     cout << "Connecting ..." << endl;
-    if (!socket.connect(new SockAddrIP4(2000, "127.0.0.1"))) {
+    if (!socket.connect(new SockAddrIP4("127.0.0.1", 2000))) {
         cout << "Error: Unable to connect to port 2000" << endl;
         return;
     }
@@ -28,7 +28,7 @@ void test()
     {
         while (!socket.is_readable());
 
-        int m = socket.read(&buffer[n], sizeof(buffer)-n-1);
+        int m = socket.recv(&buffer[n], sizeof(buffer)-n-1);
         if (m != 0) {
             n += m;
             continue;

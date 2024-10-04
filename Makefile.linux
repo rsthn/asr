@@ -57,6 +57,8 @@ udp_server: examples/udp_server
 	@$<
 udp_client: examples/udp_client
 	@$<
+udp_broadcast: examples/udp_broadcast
+	@$<
 tcp_server: examples/tcp_server
 	@$<
 tcp_client: examples/tcp_client

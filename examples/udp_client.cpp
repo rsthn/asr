@@ -18,7 +18,7 @@ void test()
     }
 
     socket.remote = new SockAddrIP4(2000, "127.0.0.1");
-    socket.write("Good day from a UDP client!");
+    socket.send("Good day from a UDP client!");
 
     char buffer[1024];
 
@@ -31,7 +31,7 @@ void test()
 
     while (true)
     {
-        buffer[socket.read(buffer, sizeof(buffer)-1)] = 0;
+        buffer[socket.recv(buffer, sizeof(buffer)-1)] = 0;
         if (!buffer[0]) {
             usleep(1000);
             continue;
@@ -42,7 +42,7 @@ void test()
         if (!strcmp(buffer, "stop"))
             break;
 
-        socket.write(messages[next_message]);
+        socket.send(messages[next_message]);
         next_message = (next_message + 1) % num_messages;
     }
 

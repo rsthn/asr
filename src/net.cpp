@@ -218,7 +218,7 @@ namespace asr {
         return connected = true;
     }
 
-    int SocketTCP::read(char *buffer, int num_bytes, int buffer_space)
+    int SocketTCP::recv(char *buffer, int num_bytes, int buffer_space)
     {
         if (socket == -1)
             return 0;
@@ -231,7 +231,7 @@ namespace asr {
         return n < 1 ? 0 : n;
     }
 
-    int SocketTCP::write(const char *buffer, int num_bytes)
+    int SocketTCP::send(const char *buffer, int num_bytes)
     {
         if (socket == -1 || !is_writeable(0))
             return 0;
@@ -268,7 +268,7 @@ namespace asr {
         return true;
     }
 
-    int SocketUDP::read(char *buffer, int num_bytes, int buffer_space)
+    int SocketUDP::recv(ptr<SockAddr> remote, char *buffer, int num_bytes, int buffer_space)
     {
         if (socket == -1)
             return 0;
@@ -276,18 +276,24 @@ namespace asr {
         if (buffer_space == -1)
             buffer_space = num_bytes;
 
+        if (remote == nullptr)
+            remote = this->remote;
+
         num_bytes = num_bytes > buffer_space ? buffer_space : num_bytes;
         int n = ::recvfrom(socket, buffer, num_bytes, 0, remote->sockaddr(), &remote->length);
         return n < 1 ? 0 : n;
     }
 
-    int SocketUDP::write(const char *buffer, int num_bytes)
+    int SocketUDP::send(ptr<SockAddr> remote, const char *buffer, int num_bytes)
     {
         if (socket == -1 || !is_writeable(0))
             return 0;
 
         if (num_bytes == -1)
             num_bytes = ::strlen(buffer);
+
+        if (remote == nullptr)
+            remote = this->remote;
 
         int n = ::sendto(socket, buffer, num_bytes, 0, remote->sockaddr(), remote->length);
         return n < 1 ? 0 : n;

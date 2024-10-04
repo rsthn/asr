@@ -21,9 +21,14 @@ namespace asr
 
         virtual ~SockAddrIP4() { }
 
-        SockAddrIP4(int port, const char *ip4=nullptr) : SockAddrIP4() {
-            set_port(port);
+        SockAddrIP4(const char *ip4, int port) : SockAddrIP4() {
             set_address(ip4);
+            set_port(port);
+        }
+
+        SockAddrIP4(int port) : SockAddrIP4() {
+            set_address(nullptr);
+            set_port(port);
         }
 
         SockAddr *alloc() const override {

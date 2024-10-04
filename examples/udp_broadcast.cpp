@@ -15,8 +15,8 @@ bool stop = false;
 void test()
 {
     SocketUDP socket;
-    if (!socket.bind(new SockAddrIP4(2000))) {
-        cout << "Error: Unable to bind socket to port 2000" << endl;
+    if (!socket.bind(new SockAddrIP4(2020))) {
+        cout << "Error: Unable to bind socket to port 2020" << endl;
         return;
     }
 
@@ -32,22 +32,29 @@ void test()
     });
 
     socket.set_nonblocking(true);
+    socket.set_broadcast(true);
+
+    ptr<SockAddr> target = new SockAddrIP4("255.255.255.255", 2020);
+    int id = rand();
+
+    char send_buff[1024];
+    sprintf(send_buff, "HELLO:ID=%u", id);
 
     char buffer[1024];
     while (!stop)
     {
         buffer[socket.recv(buffer, sizeof(buffer)-1)] = 0;
-        if (!buffer[0]) {
-            usleep(1000);
+        if (!buffer[0])
+        {
+            socket.send(target, send_buff);
+            usleep(1e6);
             continue;
         }
 
+        if (!strcmp(send_buff, buffer))
+            continue;
+
         cout << "\e[90m" << socket.remote << "\e[0m: " << buffer << endl;
-
-        if (strcmp(buffer, "stop"))
-            strcat(buffer, " - ACK");
-
-        socket.send(buffer);
     }
 
     cout << "\e[32m[Exiting]\e[0m" << endl;

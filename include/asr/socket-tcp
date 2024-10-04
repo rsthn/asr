@@ -75,7 +75,7 @@ namespace asr
          * @param num_bytes Number of bytes to write. If not specified the length of the buffer (strlen) will be used.
          * @return int
          */
-        int write(const char *buffer, int num_bytes=-1);
+        int send(const char *buffer, int num_bytes=-1);
 
         /**
          * Reads at most `num_bytes` from the socket into the given buffer and returns number of bytes read.
@@ -86,7 +86,7 @@ namespace asr
          * @param buffer_space Number of bytes available in the buffer. If not specified `num_bytes` will be used.
          * @return int
          */
-        int read(char *buffer, int num_bytes, int buffer_space=-1);
+        int recv(char *buffer, int num_bytes, int buffer_space=-1);
     };
 
 };
