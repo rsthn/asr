@@ -51,9 +51,6 @@ void test()
             continue;
         }
 
-        if (!strcmp(send_buff, buffer))
-            continue;
-
         cout << "\e[90m" << socket.remote << "\e[0m: " << buffer << endl;
     }
 
