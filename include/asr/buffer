@@ -1,0 +1,270 @@
+#ifndef __ASR_BUFFER_H
+#define __ASR_BUFFER_H
+
+#include <asr/defs>
+
+namespace asr {
+
+    /**
+     * Implementation of a circular I/O buffer with data level detection triggers (issues `fill_request` and `drain_request`).
+     */
+    class Buffer
+    {
+        protected:
+
+        /**
+         * Memory block for the buffer.
+         */
+        char *data;
+
+        /**
+         * Number of bytes of data available in the buffer. Zero means empty.
+         */
+        int buffer_level;
+
+        /**
+         * Offset to bottom of the buffer (empty space).
+         */
+        int offset_bottom;
+
+        /**
+         * Offset to the top of the buffer (available data).
+         */
+        int offset_top;
+
+        /**
+         * Size in bytes of the buffer.
+         */
+        int buffer_size;
+
+        /**
+         * Indicates if the object is the owner of the buffer data so that the destructor will deallocate it.
+         */
+        bool is_owner;
+
+        /**
+         * Sets when there is no more data to read available in the buffer.
+         * 
+         */
+        bool _eof;
+
+        /**
+        **	Executed when at least nMin and at most nMax bytes are required to be available in the buffer. When nMax is zero, there is no limit
+        **	of maximum number bytes to be filled. When inquiry is true, no data operation should be made, only return if it is possible.
+        */
+        virtual bool fill_request(int n_min, int n_max=0, bool inquiry=false) { return false; }
+
+        /**
+        **	Executed when at least nMin and at most nMax bytes of free space are required. When nMax is zero, there is no limit of maximum number
+        **	of bytes to free. When inquiry is true, no data operation should be made, only return if it is possible.
+        */
+        virtual bool drain_request(int n_min, int n_max=0, bool inquiry=false) { return false; }
+
+        /**
+        **	Executed when data was written to the buffer.
+        */
+        virtual void on_level_filled(const char *data, int length) { }
+
+        /**
+         * Updates the EOF flag based on the buffer level.
+         * @param bytes_read Number of bytes read in the last operation. Helps to prevent false EOF detection.
+         * @return Buffer*
+         */
+        Buffer *update_eof(int bytes_read=0) {
+            _eof = buffer_level == 0 && !bytes_read;
+            return this;
+        }
+
+
+        public:
+
+        /**
+         * Constructs the object and allocates a buffer of the given size. If size of zero is provided no buffer will be
+         * allocated, that would be useful for derived classes implementing unbuffered I/O.
+         * 
+         * @param buffer_size
+         */
+        Buffer(int buffer_size=2048);
+
+        /**
+         * Constructs a buffer that reads/writes to the specified array.
+         *
+         * @param data Buffer data.
+         * @param buffer_size Size of the buffer.
+         * @param buffer_level Current buffer level.
+         * @param is_owner Indicates if the object is the owner of the buffer data so that the destructor will deallocate it.
+         */
+        Buffer(char *data, int buffer_size, int buffer_level, bool is_owner=false);
+
+        /**
+         * Responsible for deallocating the data buffer.
+         */
+        virtual ~Buffer();
+
+        /**
+         * Drains the buffer contents.
+         */
+        void flush();
+
+        /**
+         * Returns the amount of bytes in the buffer for read operations.
+         * @return int
+         */
+        virtual int bytes_available() { return buffer_level; }
+
+        /**
+         * Returns the amount of bytes in the buffer for write operations.
+         * @return int
+         */
+        virtual int space_available() { return buffer_size - buffer_level; }
+
+        /**
+         * Returns the EOF flag.
+         * @return bool
+         */
+        bool eof() const {
+            return _eof;
+        }
+
+        /**
+         * Returns the underlying circular buffer data.
+         * @return char *
+         */
+        char *get_data() const {
+            return data;
+        }
+
+        /**
+         * Returns the buffer data as a zero-terminated string. If the buffer has already been circulated results might be inconsistent.
+         * @return const char *
+         */
+        const char *c_str()
+        {
+            if (buffer_level < buffer_size)
+                data[buffer_level] = '\0';
+            else
+                data[buffer_size-1] = '\0';
+
+            return data;
+        }
+
+        /**
+         * Writes data to the buffer and returns the amount of bytes written.
+         *
+         * @param data Data to be written.
+         * @param length Number of bytes to be written.
+         * @return int
+         */
+        int fill(const char *data, int length);
+
+        /**
+         * Reads data (drain-buffer) into the given buffer and returns the actual number of bytes read.
+         * If `release_space` is false the data from the buffer will not be removed and the specified amount of bytes must be in
+         * the buffer (or at least be able to fit in the free space by filling it using `fill_request`) or it will return 0.
+         * If the data parameter is `nullptr`, data will be read but not stored in the output buffer.
+         * 
+         * @param data Output buffer.
+         * @param length Number of bytes to read.
+         * @param release_space When `false` data from the buffer will not be removed (peek mode).
+         * @return int
+         */
+        int drain(char *data, int length, bool release_space=true);
+
+        /**
+         * Drains a certain amount of bytes from the buffer.
+         *
+         * @param num_bytes Number of bytes to drain.
+         * @return Number of bytes drained.
+         */
+        int drain(int num_bytes) {
+            return drain(nullptr, num_bytes, true);
+        }
+
+        /**
+         * Writes data to the buffer (all or nothing).
+         *
+         * @param data Data to be written.
+         * @param length If -1 `strlen` will be used to get length.
+         * @return `true` if successful
+         */
+        bool write(const char *data, int length=0);
+
+        /**
+         * Reads data from the buffer (all or nothing). The output byte at index 'length' will be 
+         * set to zero if extra_bytes > 0.
+         *
+         * @param length Number of bytes to read.
+         * @param buff Output buffer. If not provided it will be allocated of size length+extra_bytes.
+         * @param release_space When `false` data from the buffer will not be removed (peek mode).
+         * @param extra_bytes Extra bytes to allocate (default 0).
+         * @return char*
+         */
+        char *read(int length, char *buff=nullptr, bool release_space=true, int extra_bytes=0);
+
+        char *read(int length, char *buff, int extra_bytes) {
+            return read(length, buff, true, extra_bytes);
+        }
+
+        /**
+         * Writes a byte to the buffer.
+         * @return bool
+         */
+        bool write_uint8(uint8_t value);
+
+        /**
+         * Writes a 16-bit integer (little endian) to the buffer.
+         * @param value
+         * @return bool
+         */
+        bool write_uint16(uint16_t value);
+
+        /**
+         * Writes a 32-bit integer (little endian) to the buffer.
+         * @param value 
+         * @return bool
+         */
+        bool write_uint32(uint32_t value);
+
+        /**
+         * Writes a string to the buffer with a leading-length byte.
+         * @param value
+         * @param length Number of bytes to write. If -1 `strlen` will be used to determine the length.
+         * @return bool
+         */
+        bool write_str(const char *value, int length=-1);
+
+        /**
+         * Reads a byte from the buffer.
+         * @param peek If true the byte will not be removed from the buffer.
+         * @return uint8_t
+         */
+        uint8_t read_uint8(bool peek=false);
+
+        /**
+         * Reads a 16-bit integer (little endian) from the buffer.
+         * @param peek If true the bytes will not be removed from the buffer.
+         * @return uint16_t
+         */
+        uint16_t read_uint16(bool peek=false);
+
+        /**
+         * Reads a 32-bit integer (little endian) from the buffer.
+         * @param peek If true the bytes will not be removed from the buffer.
+         * @return uint32_t
+         */
+        uint32_t read_uint32(bool peek=false);
+
+        /**
+         * Reads a line ending with `nl` into the specified buffer (length should include the trailing zero).
+         * 
+         * @param buffer Buffer to store the line.
+         * @param length Maximum number of bytes to read.
+         * @param nl Character that indicates the end of the line.
+         * @return Returns nullptr when EOF is reached and no data is read into the buffer.
+         */
+        char *read_line (char *buffer, int length, char nl='\n');
+    };
+
+};
+
+#endif

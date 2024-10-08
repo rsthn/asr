@@ -125,18 +125,18 @@ namespace utils {
 	LList<Pair<const String*,Object*>*> *Object::getObjectData (const char* name)
 	{
 		Object *value = get(name);
-		return value == nullptr || value->type != OBJECT ? nullptr : value->value._object->getData();
+		return value == nullptr || value->type != OBJECT ? nullptr : value->value._object->get_data();
 	}
 
 	LList<Pair<const String*,Object*>*> *Object::getObjectData (int index)
 	{
 		Object *value = get(index);
-		return value == nullptr || value->type != OBJECT ? nullptr : value->value._object->getData();
+		return value == nullptr || value->type != OBJECT ? nullptr : value->value._object->get_data();
 	}
 
 	LList<Pair<const String*,Object*>*> *Object::getObjectData()
 	{
-		return type == OBJECT ? value._object->getData() : nullptr;
+		return type == OBJECT ? value._object->get_data() : nullptr;
 	}
 
 	/**
@@ -947,16 +947,16 @@ namespace utils {
 
 				switch (ch)
 				{
-					case '\0': output->writeUInt8('\\'); output->writeUInt8('0'); break;
-					case '\b': output->writeUInt8('\\'); output->writeUInt8('b'); break;
-					case '\t': output->writeUInt8('\\'); output->writeUInt8('t'); break;
-					case '\n': output->writeUInt8('\\'); output->writeUInt8('n'); break;
-					case '\f': output->writeUInt8('\\'); output->writeUInt8('f'); break;
-					case '\r': output->writeUInt8('\\'); output->writeUInt8('r'); break;
-					case '\\': output->writeUInt8('\\'); output->writeUInt8('\\'); break;
-					case '\"': output->writeUInt8('\\'); output->writeUInt8('"'); break;
-					case '\'': output->writeUInt8('\\'); output->writeUInt8('\''); break;
-					default: output->writeUInt8(ch); break;
+					case '\0': output->write_uint8('\\'); output->write_uint8('0'); break;
+					case '\b': output->write_uint8('\\'); output->write_uint8('b'); break;
+					case '\t': output->write_uint8('\\'); output->write_uint8('t'); break;
+					case '\n': output->write_uint8('\\'); output->write_uint8('n'); break;
+					case '\f': output->write_uint8('\\'); output->write_uint8('f'); break;
+					case '\r': output->write_uint8('\\'); output->write_uint8('r'); break;
+					case '\\': output->write_uint8('\\'); output->write_uint8('\\'); break;
+					case '\"': output->write_uint8('\\'); output->write_uint8('"'); break;
+					case '\'': output->write_uint8('\\'); output->write_uint8('\''); break;
+					default: output->write_uint8(ch); break;
 				}
 			}
 		};
@@ -972,8 +972,8 @@ namespace utils {
 					if (pretty) output->write(String::sprintf("%*s", 4*level, ""));
 					i->value->saveTo(output, pretty, strict, level);
 					if (i->next()) {
-						output->writeUInt8(',');
-						if (pretty) output->writeUInt8('\n');
+						output->write_uint8(',');
+						if (pretty) output->write_uint8('\n');
 					}
 				}
 
@@ -986,25 +986,25 @@ namespace utils {
 				output->write("{\n");
 				level++;
 
-				for (Linkable<Pair<const String*,Object*>*> *i = this->value._object->getData()->head(); i; i = i->next())
+				for (Linkable<Pair<const String*,Object*>*> *i = this->value._object->get_data()->head(); i; i = i->next())
 				{
 					if (pretty) output->write(String::sprintf("%*s", 4*level, ""));
-					if (strict) output->writeUInt8('"');
+					if (strict) output->write_uint8('"');
 					writeEscaped(output, i->value->key->c_str());
-					if (strict) output->writeUInt8('"');
-					output->writeUInt8(':');
-					if (pretty) output->writeUInt8(' ');
+					if (strict) output->write_uint8('"');
+					output->write_uint8(':');
+					if (pretty) output->write_uint8(' ');
 
 					i->value->value->saveTo(output, pretty, strict, level);
 					if (i->next()) {
-						output->writeUInt8(',');
-						if (pretty) output->writeUInt8('\n');
+						output->write_uint8(',');
+						if (pretty) output->write_uint8('\n');
 					}
 				}
 
 				level--;
 				if (pretty) output->write(String::sprintf("\n%*s", 4*level, ""));
-				output->writeUInt8('}');
+				output->write_uint8('}');
 				break;
 
 			case BOOL:
@@ -1016,9 +1016,9 @@ namespace utils {
 				break;
 
 			case STRING:
-				output->writeUInt8('"');
+				output->write_uint8('"');
 				writeEscaped(output, this->value._string->c_str());
-				output->writeUInt8('"');
+				output->write_uint8('"');
 				break;
 
 			case NUL:
@@ -1034,7 +1034,7 @@ namespace utils {
 	{
 		if (output == nullptr) return false;
 
-		FileOutputStream fso (output);
+		OFileBuffer fso (output);
 		saveTo(&fso, pretty, strict);
 
 		return true;
@@ -1047,7 +1047,7 @@ namespace utils {
 	{
 		if (filename == nullptr) return false;
 
-		FileOutputStream fso (filename, FileOutputStream::O_BINARY);
+		OFileBuffer fso (filename, OFileBuffer::O_BINARY);
 		saveTo (&fso, pretty, strict);
 
 		return true;

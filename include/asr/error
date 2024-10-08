@@ -1,0 +1,66 @@
+#ifndef __ASR_ERROR_H
+#define __ASR_ERROR_H
+
+#include <asr/defs>
+#include <string>
+
+namespace asr {
+
+    /**
+     * Describes an error.
+     */
+    class Error
+    {
+        protected:
+
+        // Error message.
+        std::string _message;
+
+        // Error code.
+        int _code;
+
+        public:
+
+        /**
+         * Creates an error with the specified message and (optional) error code.
+         */
+        Error(const char *message, int code=0) : _message(message), _code(code)
+        { }
+
+        /**
+         * Creates an error from a String object. The provided string will be deleted by the destructor.
+         */
+        Error(std::string& message, int code=0) : _message(message), _code(code)
+        { }
+
+        /**
+         * Error only with an error code.
+         */
+        Error(int code) : _code(code)
+        { }
+
+        /**
+         */
+        virtual ~Error() {
+        }
+
+        /**
+         * Returns the error message.
+         * @return const char* 
+         */
+        virtual const char *message() const {
+            return _message.c_str();
+        }
+
+        /**
+         * Returns the error code.
+         * @return int 
+         */
+        virtual int code() const {
+            return _code;
+        }
+    };
+
+};
+
+#endif

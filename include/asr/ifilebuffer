@@ -1,0 +1,83 @@
+#ifndef __ASR_IFILEBUFFER_H
+#define __ASR_IFILEBUFFER_H
+
+#include <asr/buffer>
+#include <cstdio>
+
+namespace asr {
+
+    /**
+     * Implements buffer functionality to read from a file. Any data written to the buffer will become
+     * available for subsequent read operations.
+     */
+    class IFileBuffer : public Buffer
+    {
+        public:
+
+        /**
+         * File open modes.
+         */
+        static constexpr int O_TEXT		= 0x00;
+        static constexpr int O_BINARY	= 0x01;
+
+        private:
+
+        /**
+         * File handle.
+         */
+        FILE *fp;
+
+        /**
+         * Indicates if the fp was created by the class and thus can be destroyed.
+         */
+        bool fp_owned;
+
+        /**
+         * File size.
+         */
+        long fsize;
+
+
+        protected:
+
+        /**
+        **	Executed when at least nMin and at most nMax bytes are required to be available in the buffer. When nMax is zero, there is no limit
+        **	of maximum number bytes to be filled. When inquiry is true, no data operation should be made, only return if it is possible.
+        */
+        bool fill_request(int n_min, int n_max=0, bool inquiry=false) override;
+
+
+        public:
+
+        /**
+         * Opens a file for reading and sets up the buffer.
+         * 
+         * @param filepath The path to the file.
+         * @param mode Mode to open the file in (O_TEXT or O_BINARY)
+         * @param buffer_size Requested buffer size (default is 512 bytes).
+         */
+        IFileBuffer(const char *filepath, int mode=O_TEXT, int buffer_size=512);
+
+        /**
+         * Uses the specified FILE as input. Will not close the file upon destruction or by manual call to `close` unless
+         * `fp_owned` is set to true. The available data will be calculated from the current file position to its end.
+         * 
+         * @param fp File handle to use.
+         * @param buffer_size Requested buffer size (default is 512 bytes).
+         * @param fp_owned Indicates if the file handle can be closed by the class.
+         */
+        IFileBuffer(FILE *fp, int buffer_size=512, bool fp_owned=false);
+
+        /**
+        */
+        virtual ~IFileBuffer();
+
+        /**
+         * Closes the file buffer.
+         */
+        void close();
+    };
+
+};
+
+#endif

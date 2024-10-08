@@ -2,7 +2,7 @@ LIB_DIR = lib
 OBJ_DIR = obj
 
 OBJS = obj/defs.o obj/ptr.o obj/event-bus.o obj/event.o obj/net.o \
-	   obj/Buffer.o obj/FileInputStream.o obj/FileOutputStream.o obj/Stream.o
+	   obj/buffer.o obj/ifilebuffer.o obj/ofilebuffer.o
 
 EXAMPLES = examples/event_bus.exe examples/refs.exe examples/udp_client.exe examples/udp_server.exe
 
@@ -51,7 +51,7 @@ lib: obj-folder lib-folder msg-1 $(OBJS)
 	@if exist $(LIB_DIR)\libasr.a (del $(LIB_DIR)\libasr.a)
 	@ar rcs $(LIB_DIR)/libasr.a $(OBJS)
 
-install: uninstall clean user-env lib
+install: clean user-env lib
 	@echo [97mDeploying include files ...[0m
 	@if exist "%USR_INCLUDE%\asr" (rmdir /s /q "%USR_INCLUDE%\asr")
 	@xcopy /s /y /k include\* "%USR_INCLUDE%" > nul

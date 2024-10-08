@@ -2,7 +2,6 @@
 #define __ASR_EVENT_H
 
 #include <asr/ptr>
-
 #include <memory>
 #include <list>
 

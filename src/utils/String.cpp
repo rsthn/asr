@@ -184,9 +184,9 @@ namespace utils {
 	/**
 	**	Chops the last N bytes of the string. The actual buffer is not modified at all, only the internal length indicator is reduced.
 	*/
-	String *String::chop (int numBytes)
+	String *String::chop (int num_bytes)
 	{
-		this->length -= numBytes ? numBytes : this->length;
+		this->length -= num_bytes ? num_bytes : this->length;
 		if (this->length < 0) this->length = 0;
 
 		this->value[this->length] = '\0';
@@ -219,20 +219,20 @@ namespace utils {
 	/**
 	**	Returns a new string made from the substring in the given range.
 	*/
-	String *String::substr (int from, int numBytes) const
+	String *String::substr (int from, int num_bytes) const
 	{
 		// Return empty string if initial offset is beyond string's size.
 		if (from > length) return new String ("");
 
 		// Process relative offset (negative).
-		if (numBytes < 1) numBytes += length;
+		if (num_bytes < 1) num_bytes += length;
 		if (from < 0) from += length;
 
-		// Calculate correct numBytes to avoid memory access errors.
-		if (from + numBytes > length) numBytes = length - from;
+		// Calculate correct num_bytes to avoid memory access errors.
+		if (from + num_bytes > length) num_bytes = length - from;
 
 		// Create string and copy the bytes to it.
-		return new String (value + from, numBytes);
+		return new String (value + from, num_bytes);
 	}
 
 	/**

@@ -199,7 +199,7 @@ class MessageHandler : public Handler
 
         bool dataAvailable (Buffer *input, Buffer *output)
         {
-            printf(GREY "Data available: %u\n" DEF, input->bytesAvailable());
+            printf(GREY "Data available: %u\n" DEF, input->bytes_available());
 
             while (true)
             {
@@ -215,7 +215,7 @@ class MessageHandler : public Handler
                 }
                 catch (const Error &e) {
                     printf(M_ERR "%s\n", e.message());
-                    input->readUInt8(); // consume the invalid byte
+                    input->read_uint8(); // consume the invalid byte
                 }
             }
 

@@ -1,0 +1,78 @@
+#ifndef __ASR_OFILEBUFFER_H
+#define __ASR_OFILEBUFFER_H
+
+#include <asr/buffer>
+#include <cstdio>
+
+namespace asr {
+
+    /**
+     * Provides a buffer to write to a file.
+     */
+    class OFileBuffer : public Buffer
+    {
+        public:
+
+        /**
+        **	File open modes.
+        */
+        static constexpr int O_TEXT     = 0x00;
+        static constexpr int O_BINARY   = 0x01;
+        static constexpr int O_APPEND   = 0x04;
+
+
+        private:
+
+        /**
+         * File descriptor.
+         */
+        FILE *fp;
+
+        /**
+         * Indicates if the fp was created by the class and thus can be destroyed.
+         */
+        bool fp_owned;
+
+
+        protected:
+
+        /**
+        **	Executed when at least nMin and at most nMax bytes of free space are required. When nMax is zero, there is no limit of maximum number
+        **	of bytes to free. When inquiry is true, no data operation should be made, only return if it is possible.
+        */
+        bool drain_request(int n_min, int n_max=0, bool inquiry=false) override;
+
+        public:
+
+        /**
+         * Opens a file for binary writing and sets up the buffer.
+         * 
+         * @param filepath The path to the file.
+         * @param mode Mode to open the file in (O_TEXT, O_BINARY or O_APPEND)
+         * @param buffer_size Requested buffer size (default is 512 bytes).
+         */
+        OFileBuffer(const char *filepath, int mode=O_TEXT, int buffer_size=512);
+
+        /**
+         * Uses the specified FILE as output. Will not close the file upon destruction or by manual call to `close` unless
+         * `fp_owned` is set to true.
+         * 
+         * @param fp File handle to use.
+         * @param buffer_size Requested buffer size (default is 512 bytes).
+         * @param fp_owned Indicates if the file handle can be closed by the class.
+         */
+        OFileBuffer(FILE *fp, int buffer_size=512, bool fp_owned=false);
+
+        /**
+        */
+        virtual ~OFileBuffer();
+
+        /**
+         * Closes the file buffer.
+         */
+        void close();
+    };
+
+};
+
+#endif
