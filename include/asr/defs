@@ -32,17 +32,17 @@ namespace asr
     /**
      * @brief Number of memory blocks currently allocated.
      */
-    extern volatile uint32_t memblocks;
+    extern uint32_t memblocks;
 
     /**
      * @brief Amount of bytes currently allocated.
      */
-    extern volatile uint32_t memsize;
+    extern uint32_t memsize;
 
     /**
      * @brief Peak maximum amount of memory used.
      */
-    extern volatile uint32_t peak_memsize;
+    extern uint32_t peak_memsize;
 
 
     /**

@@ -14,9 +14,9 @@
 namespace asr
 {
     // Memory tracking variables.
-    volatile uint32_t memblocks = 0;
-    volatile uint32_t memsize = 0;
-    volatile uint32_t peak_memsize = 0;
+    uint32_t memblocks = 0;
+    uint32_t memsize = 0;
+    uint32_t peak_memsize = 0;
 
     // Enables trace() messages to be sent to STDOUT instead of the log file.
     bool stdout_trace_enabled = false;
