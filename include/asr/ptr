@@ -9,10 +9,9 @@ namespace asr
     class refs
     {
         public:
-        static std::unordered_map<void*, int> *memory;
-        static void *add (void *ptr);
-        static bool remove (void *ptr);
-        static void shutdown();
+            static void *add (void *ptr);
+            static bool remove (void *ptr);
+            static void shutdown();
     };
 
     template<class T>
@@ -26,10 +25,20 @@ namespace asr
 
         /**
          */
-        ptr() { }
-        ptr(T *value) { set(value); }
-        ptr(const ptr& other) { set(other.value); }
-        ptr(const ptr&& other) noexcept { set(other.value); }
+        ptr()
+        { }
+
+        ptr (T *value) {
+            set(value);
+        }
+
+        ptr (const ptr& other) {
+            set(other.value);
+        }
+
+        ptr (const ptr&& other) noexcept {
+            set(other.value);
+        }
 
         virtual ~ptr() {
             if (refs::remove(value))
@@ -57,12 +66,12 @@ namespace asr
 
         /**
          */
-        ptr& operator=(const ptr& other) {
+        ptr& operator= (const ptr& other) {
             set(other.value);
             return *this;
         }
 
-        ptr& operator=(ptr&& other) noexcept
+        ptr& operator= (ptr&& other) noexcept
         {
             if (value == other.value)
                 return *this;
@@ -77,11 +86,11 @@ namespace asr
 
         /**
          */
-        bool operator==(void *other) const {
+        bool operator== (void *other) const {
             return value == other;
         }
 
-        bool operator!=(void *other) const {
+        bool operator!= (void *other) const {
             return value != other;
         }
 

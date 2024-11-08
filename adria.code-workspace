@@ -65,7 +65,10 @@
             "socket-addr-ipv6": "cpp",
             "socket-udp": "cpp",
             "socket-addr-ip4": "cpp",
-            "buffer": "cpp"
+            "buffer": "cpp",
+            "message-schema": "cpp",
+            "error": "cpp",
+            "defs": "cpp"
         }
     }
 }

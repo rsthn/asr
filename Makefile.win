@@ -7,16 +7,20 @@ OBJS = obj/defs.o obj/ptr.o obj/event-bus.o obj/event.o obj/net.o \
 EXAMPLES = examples/event_bus.exe examples/refs.exe examples/udp_client.exe examples/udp_server.exe
 
 CC = clang++
-CCFLAGS = -Qunused-arguments -Wno-format-security -fcolor-diagnostics -fansi-escape-codes -Wno-format -std=c++17 \
+CCFLAGS = -Qunused-arguments -Wno-format-security -fcolor-diagnostics -fansi-escape-codes -Wno-format -std=c++20 \
 		  -Iinclude -Llib -O1 -Wl,-s -static -pthread -static-libstdc++ -static-libgcc -Wno-switch -g
 
-vpath %.cpp src:src/crypto:src/events:src/io:src/net:src/utils:examples
+vpath %.cpp src:examples:utils
 
 obj/%.o: %.cpp
 	@echo [90m - [96m$<[0m
 	@$(CC) $(CCFLAGS) -c -o $@ $<
 
 examples/%.exe: %.cpp
+	@echo [90m - [96m$<[0m
+	@$(CC) $(CCFLAGS) $< -o $@ -lasr -lws2_32
+
+utils/%.exe: %.cpp
 	@echo [90m - [96m$<[0m
 	@$(CC) $(CCFLAGS) $< -o $@ -lasr -lws2_32
 
@@ -65,12 +69,18 @@ msg-2:
 examples: msg-2 $(EXAMPLES)
 	@echo [97mDone[0m
 
+# Utilities
+rssc: utils/rssc.exe
+	@$<
+
 # Build and run examples
 event_bus: examples/event_bus.exe
 	@$<
 test: examples/test.exe
 	@$<
 refs: examples/refs.exe
+	@$<
+data_schema: examples/data_schema.exe
 	@$<
 udp_server: examples/udp_server.exe
 	@$<

@@ -44,7 +44,6 @@ namespace asr {
 
         /**
          * Sets when there is no more data to read available in the buffer.
-         * 
          */
         bool _eof;
 
@@ -52,18 +51,23 @@ namespace asr {
         **	Executed when at least nMin and at most nMax bytes are required to be available in the buffer. When nMax is zero, there is no limit
         **	of maximum number bytes to be filled. When inquiry is true, no data operation should be made, only return if it is possible.
         */
-        virtual bool fill_request(int n_min, int n_max=0, bool inquiry=false) { return false; }
+        virtual bool fill_request (int n_min, int n_max=0, bool inquiry=false) {
+            return false;
+        }
 
         /**
         **	Executed when at least nMin and at most nMax bytes of free space are required. When nMax is zero, there is no limit of maximum number
         **	of bytes to free. When inquiry is true, no data operation should be made, only return if it is possible.
         */
-        virtual bool drain_request(int n_min, int n_max=0, bool inquiry=false) { return false; }
+        virtual bool drain_request (int n_min, int n_max=0, bool inquiry=false) {
+            return false;
+        }
 
         /**
         **	Executed when data was written to the buffer.
         */
-        virtual void on_level_filled(const char *data, int length) { }
+        virtual void on_level_filled (const char *data, int length)
+        { }
 
         /**
          * Updates the EOF flag based on the buffer level.
@@ -79,12 +83,22 @@ namespace asr {
         public:
 
         /**
+         * Read offset incremented when data is read from the buffer.
+         */
+        unsigned int read_offset;
+
+        /**
+         * Write offset incremented when data is written to the buffer.
+         */
+        unsigned int write_offset;
+
+        /**
          * Constructs the object and allocates a buffer of the given size. If size of zero is provided no buffer will be
          * allocated, that would be useful for derived classes implementing unbuffered I/O.
          * 
          * @param buffer_size
          */
-        Buffer(int buffer_size=2048);
+        Buffer (int buffer_size=2048);
 
         /**
          * Constructs a buffer that reads/writes to the specified array.
@@ -94,7 +108,7 @@ namespace asr {
          * @param buffer_level Current buffer level.
          * @param is_owner Indicates if the object is the owner of the buffer data so that the destructor will deallocate it.
          */
-        Buffer(char *data, int buffer_size, int buffer_level, bool is_owner=false);
+        Buffer (char *data, int buffer_size, int buffer_level, bool is_owner=false);
 
         /**
          * Responsible for deallocating the data buffer.
@@ -110,13 +124,17 @@ namespace asr {
          * Returns the amount of bytes in the buffer for read operations.
          * @return int
          */
-        virtual int bytes_available() { return buffer_level; }
+        virtual int bytes_available() {
+            return buffer_level;
+        }
 
         /**
          * Returns the amount of bytes in the buffer for write operations.
          * @return int
          */
-        virtual int space_available() { return buffer_size - buffer_level; }
+        virtual int space_available() {
+            return buffer_size - buffer_level;
+        }
 
         /**
          * Returns the EOF flag.
@@ -155,7 +173,7 @@ namespace asr {
          * @param length Number of bytes to be written.
          * @return int
          */
-        int fill(const char *data, int length);
+        int fill (const char *data, int length);
 
         /**
          * Reads data (drain-buffer) into the given buffer and returns the actual number of bytes read.
@@ -168,7 +186,7 @@ namespace asr {
          * @param release_space When `false` data from the buffer will not be removed (peek mode).
          * @return int
          */
-        int drain(char *data, int length, bool release_space=true);
+        int drain (char *data, int length, bool release_space=true);
 
         /**
          * Drains a certain amount of bytes from the buffer.
@@ -176,7 +194,7 @@ namespace asr {
          * @param num_bytes Number of bytes to drain.
          * @return Number of bytes drained.
          */
-        int drain(int num_bytes) {
+        int drain (int num_bytes) {
             return drain(nullptr, num_bytes, true);
         }
 
@@ -187,7 +205,7 @@ namespace asr {
          * @param length If -1 `strlen` will be used to get length.
          * @return `true` if successful
          */
-        bool write(const char *data, int length=0);
+        bool write (const char *data, int length=0);
 
         /**
          * Reads data from the buffer (all or nothing). The output byte at index 'length' will be 
@@ -199,9 +217,9 @@ namespace asr {
          * @param extra_bytes Extra bytes to allocate (default 0).
          * @return char*
          */
-        char *read(int length, char *buff=nullptr, bool release_space=true, int extra_bytes=0);
+        char *read (int length, char *buff=nullptr, bool release_space=true, int extra_bytes=0);
 
-        char *read(int length, char *buff, int extra_bytes) {
+        char *read (int length, char *buff, int extra_bytes) {
             return read(length, buff, true, extra_bytes);
         }
 
@@ -209,21 +227,40 @@ namespace asr {
          * Writes a byte to the buffer.
          * @return bool
          */
-        bool write_uint8(uint8_t value);
+        bool write_uint8 (int value);
+        static void write_uint8_to (char *buff, int value);
 
         /**
          * Writes a 16-bit integer (little endian) to the buffer.
          * @param value
          * @return bool
          */
-        bool write_uint16(uint16_t value);
+        bool write_uint16 (int value);
+        static void write_uint16_to (char *buff, int value);
+
+        /**
+         * Writes a 16-bit integer (big endian) to the buffer.
+         * @param value
+         * @return bool
+         */
+        bool write_uint16be (int value);
+        static void write_uint16be_to (char *buff, int value);
 
         /**
          * Writes a 32-bit integer (little endian) to the buffer.
          * @param value 
          * @return bool
          */
-        bool write_uint32(uint32_t value);
+        bool write_uint32 (int value);
+        static void write_uint32_to (char *buff, int value);
+
+        /**
+         * Writes a 32-bit integer (big endian) to the buffer.
+         * @param value 
+         * @return bool
+         */
+        bool write_uint32be (int value);
+        static void write_uint32be_to (char *buff, int value);
 
         /**
          * Writes a string to the buffer with a leading-length byte.
@@ -231,28 +268,62 @@ namespace asr {
          * @param length Number of bytes to write. If -1 `strlen` will be used to determine the length.
          * @return bool
          */
-        bool write_str(const char *value, int length=-1);
+        bool write_str (const char *value, int length=-1);
 
         /**
          * Reads a byte from the buffer.
          * @param peek If true the byte will not be removed from the buffer.
-         * @return uint8_t
+         * @return int
          */
-        uint8_t read_uint8(bool peek=false);
+        int read_uint8 (bool peek=false);
+        static int read_uint8_from (char *buff);
+
+        int read_int8 (bool peek=false);
+        static int read_int8_from (char *buff);
 
         /**
          * Reads a 16-bit integer (little endian) from the buffer.
          * @param peek If true the bytes will not be removed from the buffer.
-         * @return uint16_t
+         * @return int
          */
-        uint16_t read_uint16(bool peek=false);
+        int read_uint16 (bool peek=false);
+        static int read_uint16_from (char *buff);
+
+        int read_int16 (bool peek=false);
+        static int read_int16_from (char *buff);
+
+        /**
+         * Reads a 16-bit integer (big endian) from the buffer.
+         * @param peek If true the bytes will not be removed from the buffer.
+         * @return int
+         */
+        int read_uint16be (bool peek=false);
+        static int read_uint16be_from (char *buff);
+
+        int read_int16be (bool peek=false);
+        static int read_int16be_from (char *buff);
 
         /**
          * Reads a 32-bit integer (little endian) from the buffer.
          * @param peek If true the bytes will not be removed from the buffer.
-         * @return uint32_t
+         * @return int
          */
-        uint32_t read_uint32(bool peek=false);
+        int read_uint32 (bool peek=false);
+        static int read_uint32_from (char *buff);
+
+        int read_int32 (bool peek=false);
+        static int read_int32_from (char *buff);
+
+        /**
+         * Reads a 32-bit integer (big endian) from the buffer.
+         * @param peek If true the bytes will not be removed from the buffer.
+         * @return int
+         */
+        int read_uint32be (bool peek=false);
+        static int read_uint32be_from (char *buff);
+
+        int read_int32be (bool peek=false);
+        static int read_int32be_from (char *buff);
 
         /**
          * Reads a line ending with `nl` into the specified buffer (length should include the trailing zero).

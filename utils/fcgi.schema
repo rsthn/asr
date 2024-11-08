@@ -1,0 +1,28 @@
+
+;; Define a variable length integer controlled by the D7 bit of the first byte.
+type varint as int
+    local val as int
+    local val as int
+    peek uint8 into val
+    if !(val & 0x80)
+        load uint8 into val
+        ret val
+    load uint32be into val
+    ret val
+
+;; FastCGI header structure
+record FCGI_Header
+    field signature as uint
+    field version as int
+    field checksum as uint
+
+    load uint32be into signature
+    check value of signature
+        0x00DEAD00
+
+    load int8 into version
+    check values of version
+        1
+        2
+
+    load uint16be into checksum

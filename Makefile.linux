@@ -10,13 +10,17 @@ CC = clang++
 CCFLAGS = -Qunused-arguments -Wno-format-security -fcolor-diagnostics -fansi-escape-codes -Wno-format -std=c++17 \
 		  -Iinclude -Llib -O1 -Wl,-s -static -pthread -static-libstdc++ -static-libgcc -Wno-switch -g
 
-vpath %.cpp src:src/crypto:src/events:src/io:src/net:src/utils:examples
+vpath %.cpp src:examples:utils
 
 obj/%.o: %.cpp
 	@echo [90m - [96m$<[0m
 	@$(CC) $(CCFLAGS) -c -o $@ $<
 
 examples/%: %.cpp
+	@echo [90m - [96m$<[0m
+	@$(CC) $(CCFLAGS) $< -o $@ -lasr
+
+utils/%: %.cpp
 	@echo [90m - [96m$<[0m
 	@$(CC) $(CCFLAGS) $< -o $@ -lasr
 
@@ -48,10 +52,19 @@ msg-2:
 examples: msg-2 $(EXAMPLES)
 	@echo [97mDone[0m
 
+# Utilities
+rssc: utils/rssc
+	@echo .
+
+rssc_fcgi: rssc
+	@./utils/rssc utils/fcgi.schema examples/fcgi.h
+
 # Build and run examples
 event_bus: examples/event_bus
 	@$<
 refs: examples/refs
+	@$<
+data_schema: examples/data_schema
 	@$<
 udp_server: examples/udp_server
 	@$<

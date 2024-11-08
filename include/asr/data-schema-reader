@@ -1,0 +1,107 @@
+#ifndef __ASR_DATA_SCHEMA_READER_H
+#define __ASR_DATA_SCHEMA_READER_H
+
+#include <asr/data-schema>
+#include <asr/buffer>
+
+namespace asr {
+
+    /**
+     * Decodes data from a buffer using a schema.
+     */
+    template<typename T>
+    class DataSchemaReader
+    {
+        private:
+
+        const DataSchema<T> *schema;
+        const DataSchema<T>::Field *field;
+
+        Buffer *input_buffer;
+        int skip_bytes;
+
+        ptr<T> output;
+
+        public:
+
+        /**
+         * State values.
+         */
+        int state[16];
+
+        /**
+         */
+        DataSchemaReader (const DataSchema<T> *schema, Buffer *input)
+            : schema(schema), input_buffer(input)
+        {
+            reset();
+            reset_state();
+        }
+
+        /**
+         * Resets the readers to initial state.
+         */
+        void reset() {
+            field = schema->root;
+            skip_bytes = 0;
+            output = new T();
+        }
+
+        /**
+         * Resets the state values to zero.
+         */
+        void reset_state() {
+            memset(state, 0, sizeof(state));
+        }
+
+        /**
+         * Sets the number of bytes to skip before reading the next field.
+         */
+        void skip (int num_bytes)
+        {
+            skip_bytes = num_bytes;
+            if (!skip_bytes) return;
+
+            while (skip_bytes > 0) {
+                int n = input_buffer->drain(skip_bytes);
+                if (!n) break;
+                skip_bytes -= n;
+            }
+        }
+
+        /**
+         * Feeds partial message data to the reader. Returns ptr<T> if a complete message has been read. Or
+         * returns `nullptr` if more data is required. Throws Error if the message is invalid.
+         */
+        ptr<T> feed()
+        {
+            while (skip_bytes > 0) {
+                int n = input_buffer->drain(skip_bytes);
+                if (!n) return nullptr;
+                skip_bytes -= n;
+            }
+
+            while (field != nullptr)
+            {
+                try {
+                    field = field->read(input_buffer, output, state);
+                }
+                catch (ErrorNotEnoughData &e) {
+                    return nullptr;
+                }
+                catch (Error &e) {
+                    reset();
+                    throw;
+                }
+            };
+
+            auto result = output;
+            reset();
+            return result;
+        }
+    };
+
+
+};
+
+#endif

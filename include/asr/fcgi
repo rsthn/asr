@@ -1,0 +1,101 @@
+#ifndef __ASR_FCGI_H
+#define __ASR_FCGI_H
+
+#include <asr/message-schema>
+#include <asr/message-reader>
+#include <iostream>
+
+namespace asr
+{
+    enum FCGIMessageType {
+        FCGI_BEGIN_REQUEST = 1,
+        FCGI_ABORT_REQUEST = 2,
+        FCGI_END_REQUEST = 3,
+        FCGI_PARAMS = 4,
+        FCGI_STDIN = 5,
+        FCGI_STDOUT = 6,
+        FCGI_STDERR = 7,
+        FCGI_DATA = 8,
+        FCGI_GET_VALUES = 9,
+        FCGI_GET_VALUES_RESULT = 10,
+        FCGI_UNKNOWN = 255
+    };
+
+    class FCGIMessage
+    {
+        public:
+
+        FCGIMessage()
+        { }
+
+        virtual ~FCGIMessage()
+        { }
+    };
+
+    class FCGIHeader
+    {
+        static MessageSchema<FCGIHeader> *schema;
+
+        public:
+
+        int version;
+        FCGIMessageType type;
+        int request_id;
+        int content_length;
+        int padding_length;
+
+        ptr<FCGIMessage> msg;
+
+        FCGIHeader() {
+            clear();
+        }
+
+        static ptr<MessageReader> createReader() {
+            return new MessageReader(schema);
+        }
+
+        void clear() {
+            version = 1;
+            type = FCGIMessageType::FCGI_UNKNOWN;
+            request_id = 0;
+            content_length = 0;
+            padding_length = 0;
+            msg = nullptr;
+        }
+
+        void dump() {
+            std::cout << "\e[90mversion: " << version << "\e[0m" << std::endl;
+            std::cout << "\e[90mtype: " << type << "\e[0m" << std::endl;
+            std::cout << "\e[90mrequest_id: " << request_id << "\e[0m" << std::endl;
+            std::cout << "\e[90mcontent_length: " << content_length << "\e[0m" << std::endl;
+            std::cout << "\e[90mpadding_length: " << padding_length << "\e[0m" << std::endl;
+        }
+    };
+
+    MessageSchema *FCGIHeader::schema = (new MessageSchema())
+        ->uint8(offsetof(FCGIHeader, version))
+            ->throws(1, "invalid version")
+            ->when(1)->end()
+        ->uint8(offsetof(FCGIHeader, type), 0)
+        ->uint16be(offsetof(FCGIHeader, request_id))
+        ->uint16be(offsetof(FCGIHeader, content_length), 1)
+        ->uint8(offsetof(FCGIHeader, padding_length))
+        ->skip(1) // reserved
+
+        ->with_state(0)
+            ->throws(2, "invalid message type")
+            ->when(FCGIMessageType::FCGI_BEGIN_REQUEST)->end()
+            //->when(FCGIMessageType::FCGI_ABORT_REQUEST)->end()
+            //->when(FCGIMessageType::FCGI_END_REQUEST)->end()
+            //->when(FCGIMessageType::FCGI_PARAMS)->end()
+            //->when(FCGIMessageType::FCGI_STDIN)->end()
+            //->when(FCGIMessageType::FCGI_STDOUT)->end()
+            //->when(FCGIMessageType::FCGI_STDERR)->end()
+            //->when(FCGIMessageType::FCGI_DATA)->end()
+            //->when(FCGIMessageType::FCGI_GET_VALUES)->end()
+            //->when(FCGIMessageType::FCGI_GET_VALUES_RESULT)->end()
+    ;
+
+};
+
+#endif

@@ -12,6 +12,9 @@ namespace asr {
         this->buffer_level = 0;
         this->offset_top = 0;
         this->offset_bottom = 0;
+
+        read_offset = 0;
+        write_offset = 0;
         update_eof();
 
         this->data = (char *)asr::alloc(this->buffer_size);
@@ -26,6 +29,9 @@ namespace asr {
         this->buffer_level = buffer_level;
         this->offset_top = 0;
         this->offset_bottom = buffer_level;
+
+        read_offset = 0;
+        write_offset = 0;
         update_eof();
 
         this->is_owner = is_owner;
@@ -95,7 +101,11 @@ namespace asr {
         }
 
         update_eof();
-        if (bytes_written) on_level_filled (input_data, bytes_written);
+
+        if (bytes_written)
+            on_level_filled (input_data, bytes_written);
+
+        write_offset += bytes_written;
         return bytes_written;
     }
 
@@ -117,7 +127,7 @@ namespace asr {
 
         int _buffer_level = buffer_level;
         int _offset_top = offset_top;
-        int bytesRead = 0;
+        int bytes_read = 0;
 
         while (length > 0)
         {
@@ -154,16 +164,18 @@ namespace asr {
                 offset_top -= buffer_size;
 
             length -= num_bytes;
-            bytesRead += num_bytes;
+            bytes_read += num_bytes;
         }
 
         if (!release_space) {
             buffer_level = _buffer_level;
             offset_top = _offset_top;
         }
+        else
+            read_offset += bytes_read;
 
-        update_eof(bytesRead);
-        return bytesRead;
+        update_eof(bytes_read);
+        return bytes_read;
     }
 
     bool Buffer::write (const char *data, int length)
@@ -208,29 +220,72 @@ namespace asr {
         return buff;
     }
 
-    bool Buffer::write_uint8 (uint8_t value)
+    bool Buffer::write_uint8 (int value)
     {
         char tmp[1];
-        tmp[0] = value;
+        write_uint8_to(tmp, value);
         return fill(tmp, 1) == 1;
     }
 
-    bool Buffer::write_uint16 (uint16_t value)
+    void Buffer::write_uint8_to (char *buff, int value)
+    {
+        buff[0] = value;
+    }
+
+    bool Buffer::write_uint16 (int value)
     {
         char tmp[2];
-        tmp[0] = value & 0xFF;
-        tmp[1] = (value >> 8) & 0xFF;
+        write_uint16_to(tmp, value);
         return fill(tmp, 2) == 2;
     }
 
-    bool Buffer::write_uint32 (uint32_t value)
+    void Buffer::write_uint16_to (char *buff, int value)
+    {
+        buff[0] = value & 0xFF;
+        buff[1] = (value >> 8) & 0xFF;
+    }
+
+    bool Buffer::write_uint16be (int value)
+    {
+        char tmp[2];
+        write_uint16be_to(tmp, value);
+        return fill(tmp, 2) == 2;
+    }
+
+    void Buffer::write_uint16be_to (char *buff, int value)
+    {
+        buff[1] = value & 0xFF;
+        buff[0] = (value >> 8) & 0xFF;
+    }
+
+    bool Buffer::write_uint32 (int value)
     {
         char tmp[4];
-        tmp[0] = value & 0xFF;
-        tmp[1] = (value >> 8) & 0xFF;
-        tmp[2] = (value >> 16) & 0xFF;
-        tmp[3] = (value >> 24) & 0xFF;
+        write_uint32_to(tmp, value);
         return fill(tmp, 4) == 4;
+    }
+
+    void Buffer::write_uint32_to (char *buff, int value)
+    {
+        buff[0] = value & 0xFF;
+        buff[1] = (value >> 8) & 0xFF;
+        buff[2] = (value >> 16) & 0xFF;
+        buff[3] = (value >> 24) & 0xFF;
+    }
+
+    bool Buffer::write_uint32be (int value)
+    {
+        char tmp[4];
+        write_uint32be_to(tmp, value);
+        return fill(tmp, 4) == 4;
+    }
+
+    void Buffer::write_uint32be_to (char *buff, int value)
+    {
+        buff[3] = value & 0xFF;
+        buff[2] = (value >> 8) & 0xFF;
+        buff[1] = (value >> 16) & 0xFF;
+        buff[0] = (value >> 24) & 0xFF;
     }
 
     bool Buffer::write_str (const char *value, int length)
@@ -242,36 +297,118 @@ namespace asr {
         return write(value, length) == length;
     }
 
-    uint8_t Buffer::read_uint8 (bool peek)
-    {
+    /* ********** */
+    int Buffer::read_uint8 (bool peek) {
         char tmp[1];
-        if (drain(tmp, 1, !peek) != 1) { return 0; }
-
-        return (unsigned char)tmp[0];
+        if (drain(tmp, 1, !peek) != 1) return 0;
+        return read_uint8_from(tmp);
     }
 
-    uint16_t Buffer::read_uint16 (bool peek)
-    {
+    int Buffer::read_uint8_from (char *buff) {
+        return (unsigned char)buff[0];
+    }
+
+    int Buffer::read_int8 (bool peek) {
+        char tmp[1];
+        if (drain(tmp, 1, !peek) != 1) return 0;
+        return read_int8_from(tmp);
+    }
+
+    int Buffer::read_int8_from (char *buff) {
+        return (char)buff[0];
+    }
+
+    /* ********** */
+    int Buffer::read_uint16 (bool peek) {
         char tmp[2];
         if (drain(tmp, 2, !peek) != 2) { return 0; }
-
-        uint16_t i = (unsigned char)tmp[1];
-        i <<= 8; i |= (unsigned char)tmp[0];
-        return i;
+        return read_uint16_from(tmp);
     }
 
-    uint32_t Buffer::read_uint32 (bool peek)
-    {
+    int Buffer::read_uint16_from (char *buff) {
+        return (((unsigned char)buff[1]) << 8) | (unsigned char)buff[0];
+    }
+
+    int Buffer::read_int16 (bool peek) {
+        char tmp[2];
+        if (drain(tmp, 2, !peek) != 2) { return 0; }
+        return read_int16_from(tmp);
+    }
+
+    int Buffer::read_int16_from (char *buff) {
+        return (int16_t)read_uint16_from(buff);
+    }
+
+    int Buffer::read_uint16be (bool peek) {
+        char tmp[2];
+        if (drain(tmp, 2, !peek) != 2) { return 0; }
+        return read_uint16be_from(tmp);
+    }
+
+    int Buffer::read_uint16be_from (char *buff) {
+        return (((unsigned char)buff[0]) << 8) | (unsigned char)buff[1];
+    }
+
+    int Buffer::read_int16be (bool peek) {
+        char tmp[2];
+        if (drain(tmp, 2, !peek) != 2) { return 0; }
+        return read_int16be_from(tmp);
+    }
+
+    int Buffer::read_int16be_from (char *buff) {
+        return (int16_t)read_uint16be_from(buff);
+    }
+
+    /* ********** */
+    int Buffer::read_uint32 (bool peek) {
         char tmp[4];
         if (drain(tmp, 4, !peek) != 4) { return 0; }
+        return read_uint32_from(tmp);
+    }
 
-        uint32_t i = (unsigned char)tmp[3];
-        i <<= 8; i |= (unsigned char)tmp[2];
-        i <<= 8; i |= (unsigned char)tmp[1];
-        i <<= 8; i |= (unsigned char)tmp[0];
+    int Buffer::read_uint32_from (char *buff) {
+        int i = (unsigned char)buff[3];
+        i <<= 8; i |= (unsigned char)buff[2];
+        i <<= 8; i |= (unsigned char)buff[1];
+        i <<= 8; i |= (unsigned char)buff[0];
         return i;
     }
 
+    int Buffer::read_int32 (bool peek) {
+        char tmp[4];
+        if (drain(tmp, 4, !peek) != 4) { return 0; }
+        return read_int32_from(tmp);
+    }
+
+    int Buffer::read_int32_from (char *buff) {
+        return (int32_t)read_uint32_from(buff);
+    }
+
+    int Buffer::read_uint32be (bool peek) {
+        char tmp[4];
+        if (drain(tmp, 4, !peek) != 4) { return 0; }
+        return read_uint32be_from(tmp);
+    }
+
+    int Buffer::read_uint32be_from (char *buff) {
+        int i = (unsigned char)buff[0];
+        i <<= 8; i |= (unsigned char)buff[1];
+        i <<= 8; i |= (unsigned char)buff[2];
+        i <<= 8; i |= (unsigned char)buff[3];
+        return i;
+    }
+
+    int Buffer::read_int32be (bool peek) {
+        char tmp[4];
+        if (drain(tmp, 4, !peek) != 4) { return 0; }
+        return read_int32be_from(tmp);
+    }
+
+    int Buffer::read_int32be_from (char *buff) {
+        return (int32_t)read_uint32be_from(buff);
+    }
+
+    /* ********** */
     char *Buffer::read_line (char *buffer, int length, char nl)
     {
         int n = 0;

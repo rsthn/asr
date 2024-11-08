@@ -27,10 +27,10 @@ namespace asr {
         Error(const char *message, int code=0) : _message(message), _code(code)
         { }
 
-        /**
-         * Creates an error from a String object. The provided string will be deleted by the destructor.
-         */
         Error(std::string& message, int code=0) : _message(message), _code(code)
+        { }
+
+        Error(std::string&& message, int code=0) : _message(message), _code(code)
         { }
 
         /**

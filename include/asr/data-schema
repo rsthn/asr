@@ -1,0 +1,724 @@
+#ifndef __ASR_DATA_SCHEMA_H
+#define __ASR_DATA_SCHEMA_H
+
+#include <asr/buffer>
+#include <asr/error>
+#include <list>
+#include <format>
+
+namespace asr {
+
+    /**
+     * Some error definitions.
+     */
+    class ErrorNotEnoughSpace : public Error {
+        public:
+            ErrorNotEnoughSpace() : Error("not enough space in the output buffer", 0) {}
+    };
+
+    class ErrorNotEnoughData : public Error {
+        public:
+            ErrorNotEnoughData() : Error("not enough data in the input buffer", 0) {}
+    };
+
+    class ErrorMaxLength : public Error {
+        public:
+            ErrorMaxLength() : Error("maximum string length exceeded", 0) {}
+    };
+
+    /**
+     * Describes the binary layout of a chunk of data.
+     */
+    template<typename T>
+    class DataSchema
+    {
+        private:
+
+        /**
+         * Field types.
+         */
+        enum FieldType {
+            T_SEQ = 1,
+            T_COND,
+            T_SKIP,
+            T_SET_STATE,
+            T_WITH_STATE,
+            T_CALL,
+
+            T_UINT8,
+            T_INT8,
+            T_UINT16,
+            T_INT16,
+            T_UINT16BE,
+            T_INT16BE,
+            T_UINT32,
+            T_INT32,
+            T_UINT32BE,
+            T_INT32BE,
+            T_STR,
+        };
+
+        /** 
+         * Condition types.
+         */
+        enum CondType {
+            C_TRUE = 1,
+            C_EQ,
+        };
+
+        struct Cond
+        {
+            CondType type;
+            int value;
+
+            Cond (CondType type, int value=0)
+                : type(type), value(value)
+            {}
+
+            bool result (int x) const {
+                switch (type) {
+                    case CondType::C_TRUE:
+                        return true;
+                    case CondType::C_EQ:
+                        return value == x;
+                }
+                return false;
+            }
+        };
+
+
+        public:
+
+        /**
+         * Describes a field in the schema.
+         */
+        class Field
+        {
+            public:
+
+            FieldType type;
+            Field *parent;
+            Field *next = nullptr;
+
+            std::list<ptr<Field>> *children = nullptr;
+            Cond *cond = nullptr;
+
+            /**
+             * Member pointer to the field in the object.
+             */
+            int T::*intptr = nullptr;
+
+            /**
+             * Member function pointer (T_CALL).
+             */
+            int (T::*fnptr)() = nullptr;
+
+            /**
+             * Indicates if the field has static buffer pre-allocated in the object (T_STR).
+             */
+            bool is_static = false;//[todo] fix ??????????????
+
+            /**
+             * Maximum length of the string (including zero byte).
+             */
+            int max_length = 256;//[todo] fix ?????????????
+
+            /**
+             * Number of bytes for the field (T_SKIP).
+             */
+            int field_num_bytes = 0;
+
+            /**
+             * State index and value (T_SET_STATE, T_WITH_STATE).
+             */
+            int state_index = -1;
+            int state_value;
+
+            /**
+             * Error code and message.
+             */
+            int errorcode = 0;
+            const char *errormsg = nullptr;
+
+
+            Field (Field *fieldParent, FieldType fieldType)
+            {
+                type = fieldType;
+                parent = fieldParent;
+                if (parent) {
+                    if (!parent->children)
+                        parent->children = new std::list<ptr<Field>>();
+
+                    if (parent->children->size() != 0)
+                        parent->children->back()->next = this;
+
+                    parent->children->push_back(this);
+                }
+
+                switch (type)
+                {
+                    case T_UINT8:
+                    case T_INT8:        
+                        field_num_bytes = 1;
+                        break;
+
+                    case T_UINT16:
+                    case T_INT16:
+                    case T_UINT16BE:
+                    case T_INT16BE:
+                        field_num_bytes = 2;
+                        break;
+
+                    case T_UINT32:
+                    case T_INT32:
+                    case T_UINT32BE:
+                    case T_INT32BE:
+                        field_num_bytes = 4;
+                        break;
+                }
+            }
+
+            ~Field() {
+                if (children != nullptr) {
+                    delete children;
+                    children = nullptr;
+                }
+
+                if (cond != nullptr) {
+                    delete cond;
+                    cond = nullptr;
+                }
+            }
+
+            void set_cond (Cond *condition) {
+                if (cond != nullptr)
+                    delete cond;
+                cond = condition;
+            }
+
+            int read_int (T *data) const {
+                return data->*intptr;
+            }
+
+            int write_int (T *data, int value) const {
+                data->*intptr = value;
+                return value;
+            }
+
+            /**
+             * Returns the number of bytes required by the field.
+             * @return int
+             */
+            int num_bytes() const {
+                return type == T_COND ? parent->num_bytes() : field_num_bytes;
+            }
+
+            /**
+             * Attempts to read the field from the buffer and writes it to the object. Returns the field to process in the
+             * next iteration or `nullptr` if the message is complete. Throws `ErrorNotEnoughData` if not enough data is
+             * available to complete the field.
+             */
+            Field *read (Buffer *input, T *output, int *state) const
+            {
+                int value;
+
+                switch (type)
+                {
+                    case T_SEQ:
+                        return children->front()->read(input, output, state);
+
+                    case T_COND:
+                        if (parent->type != T_WITH_STATE)
+                            value = parent->read_int(output);
+                        else
+                            value = state[parent->state_index];
+                        break;
+
+                    case T_SKIP:
+                        if (input->bytes_available() < field_num_bytes) throw ErrorNotEnoughData();
+                        break;
+
+                    case T_SET_STATE:
+                        state[state_index] = state_value;
+                        break;
+
+                    case T_WITH_STATE:
+                        value = state[state_index];
+                        break;
+
+                    case T_CALL:
+                        value = (output->*fnptr)();
+                        break;
+
+                    case T_UINT8:
+                        if (input->bytes_available() < 1) throw ErrorNotEnoughData();
+                        value = write_int(output, input->read_uint8(true));
+                        if (state_index != -1) state[state_index] = value;
+                        break;
+
+                    case T_INT8:
+                        if (input->bytes_available() < 1) throw ErrorNotEnoughData();
+                        value = write_int(output, input->read_int8(true));
+                        if (state_index != -1) state[state_index] = value;
+                        break;
+
+                    case T_UINT16:
+                        if (input->bytes_available() < 2) throw ErrorNotEnoughData();
+                        value = write_int(output, input->read_uint16(true));
+                        if (state_index != -1) state[state_index] = value;
+                        break;
+
+                    case T_INT16:
+                        if (input->bytes_available() < 2) throw ErrorNotEnoughData();
+                        value = write_int(output, input->read_int16(true));
+                        if (state_index != -1) state[state_index] = value;
+                        break;
+
+                    case T_UINT16BE:
+                        if (input->bytes_available() < 2) throw ErrorNotEnoughData();
+                        value = write_int(output, input->read_uint16be(true));
+                        if (state_index != -1) state[state_index] = value;
+                        break;
+
+                    case T_INT16BE:
+                        if (input->bytes_available() < 2) throw ErrorNotEnoughData();
+                        value = write_int(output, input->read_int16be(true));
+                        if (state_index != -1) state[state_index] = value;
+                        break;
+
+                    case T_UINT32:
+                        if (input->bytes_available() < 4) throw ErrorNotEnoughData();
+                        value = write_int(output, input->read_uint32(true));
+                        if (state_index != -1) state[state_index] = value;
+                        break;
+
+                    case T_INT32:
+                        if (input->bytes_available() < 4) throw ErrorNotEnoughData();
+                        value = write_int(output, input->read_int32(true));
+                        if (state_index != -1) state[state_index] = value;
+                        break;
+
+                    case T_UINT32BE:
+                        if (input->bytes_available() < 4) throw ErrorNotEnoughData();
+                        value = write_int(output, input->read_uint32be(true));
+                        if (state_index != -1) state[state_index] = value;
+                        break;
+
+                    case T_INT32BE:
+                        if (input->bytes_available() < 4) throw ErrorNotEnoughData();
+                        value = write_int(output, input->read_int32be(true));
+                        if (state_index != -1) state[state_index] = value;
+                        break;
+
+                    case T_STR:
+                        //if (input->bytes_available() < 1) throw ErrorNotEnoughData();
+                        //value = input->read_uint8(true);
+
+                        //if (input->bytes_available() < value+1)
+                        //    throw ErrorNotEnoughData();
+
+                        //if (input->read_uint8()+1 > max_length)
+                        //    throw ErrorMaxLength();
+
+                        //if (!is_static) {
+                        //    char *str = (char *)asr::alloc(value + 1);
+                        //    input->read(value, str, 1);
+                        //    write_ptr(output, str);
+                        //} else {
+                        //    input->read(value, output+offset, 1);
+                        //}
+
+                        break;
+                }
+
+                bool t_skip_cond = false;
+                if (cond && !cond->result(value)) {
+                    if (type != T_COND)
+                        throw Error(std::format("{}: {}", errormsg ? errormsg : "invalid field value found", value), errorcode);
+                    t_skip_cond = true;
+                }
+
+                // Successful detection.
+                if (!t_skip_cond && children && children->size() != 0) {
+                    if (type == T_COND)
+                        input->drain(num_bytes());
+                    return children->front();
+                }
+
+                // Move to next one if conditioned failed (try another) or if field is not conditional.
+                if (next && (t_skip_cond || type != T_COND)) {
+                    if (type != T_COND)
+                        input->drain(num_bytes());
+                    return next;
+                }
+
+                // From here on, we've reached the end of a sequence.
+                if (t_skip_cond)
+                    throw Error(std::format("{}: {}", parent->errormsg ? parent->errormsg : "invalid field value found", value), parent->errorcode);
+
+                input->drain(num_bytes());
+
+                Field *field = parent;
+                while (field)
+                {
+                    if (field->type == T_COND) {
+                        field = field->parent;
+                        continue;
+                    }
+
+                    if (!field->parent)
+                        return nullptr;
+
+                    if (field->next)
+                        return field->next;
+
+                    field = field->parent;
+                }
+
+                return nullptr;
+            }
+
+            /**
+             * Writes the field from the object into the buffer. Returns the next field to process in the next
+             * iteration or `nullptr` if the message is complete. Throws `ErrorNotEnoughSpace` if not enough space is
+             * available in the output buffer.
+             */
+            Field *write (Buffer *output, T *input, int *state) const
+            {
+                int value;
+
+                switch (type)
+                {
+                    case T_SEQ:
+                        return children->front()->write(output, input, state);
+
+                    case T_COND:
+                        if (parent->type != T_WITH_STATE)
+                            value = parent->read_int(input);
+                        else
+                            value = state[parent->state_index];
+                        break;
+
+                    case T_SKIP:
+                        if (output->space_available() < field_num_bytes) throw ErrorNotEnoughSpace();
+                        for (int i = 0; i < field_num_bytes; i++)
+                            output->write_uint8(0);
+                        break;
+
+                    case T_SET_STATE:
+                        state[state_index] = state_value;
+                        break;
+
+                    case T_WITH_STATE:
+                        value = state[state_index];
+                        break;
+
+                    case T_INT8:
+                    case T_UINT8:
+                        if (output->space_available() < 1) throw ErrorNotEnoughSpace();
+                        output->write_uint8(value = read_int(input));
+                        if (state_index != -1) state[state_index] = value;
+                        break;
+
+                    case T_INT16:
+                    case T_UINT16:
+                        if (output->space_available() < 2) throw ErrorNotEnoughSpace();
+                        output->write_uint16(value = read_int(input));
+                        if (state_index != -1) state[state_index] = value;
+                        break;
+
+                    case T_INT32:
+                    case T_UINT32:
+                        if (output->space_available() < 4) throw ErrorNotEnoughSpace();
+                        output->write_uint32(value = read_int(input));
+                        if (state_index != -1) state[state_index] = value;
+                        break;
+
+                    case T_INT16BE:
+                    case T_UINT16BE:
+                        if (output->space_available() < 2) throw ErrorNotEnoughSpace();
+                        output->write_uint16be(value = read_int(input));
+                        if (state_index != -1) state[state_index] = value;
+                        break;
+
+                    case T_INT32BE:
+                    case T_UINT32BE:
+                        if (output->space_available() < 4) throw ErrorNotEnoughSpace();
+                        output->write_uint32be(value = read_int(input));
+                        if (state_index != -1) state[state_index] = value;
+                        break;
+
+                    case T_STR:
+                        //if (output->space_available() < 1) throw ErrorNotEnoughSpace();
+
+                        //char *ptr = is_static ? (input+offset) : read_ptr(input);
+                        //value = strlen(ptr) + 1;
+
+                        //if (value > max_length) throw ErrorMaxLength();
+                        //if (output->space_available() < value) throw ErrorNotEnoughSpace();
+
+                        //output->write_uint8(value-1);
+                        //output->write(ptr, value-1);
+                        break;
+                }
+
+                bool t_skip_cond = false;
+                if (cond && !cond->result(value)) {
+                    if (type != T_COND)
+                        throw Error(std::format("{}: {}", errormsg ? errormsg : "invalid field value found", value), errorcode);
+                    t_skip_cond = true;
+                }
+
+                // Successful detection.
+                if (!t_skip_cond && children && children->size() != 0)
+                    return children->front()->write(output, input, state);
+
+                // Move to next one if conditioned failed (try another) or if field is not conditional.
+                if (next && (t_skip_cond || type != T_COND))
+                    return next;
+
+                // From here on, we've reached the end of a sequence.
+                if (t_skip_cond)
+                    throw Error(std::format("{}: {}", parent->errormsg ? parent->errormsg : "invalid field value found", value), parent->errorcode);
+
+                Field *field = parent;
+                while (field)
+                {
+                    if (field->type == T_COND) {
+                        field = field->parent;
+                        continue;
+                    }
+
+                    if (!field->parent)
+                        return nullptr;
+
+                    if (field->next)
+                        return field->next;
+
+                    field = field->parent;
+                }
+
+                return nullptr;
+            }
+        };
+
+
+        Field *root;
+
+        DataSchema() {
+            root = new Field(nullptr, T_SEQ);
+        }
+
+        ~DataSchema() {
+            delete root;
+        }
+
+        /**
+         * Adds an 8-bit unsigned field.
+         * @return DataSchema*
+         */
+        DataSchema *uint8 (unsigned int T::*intptr) {
+            (new Field(root, T_UINT8))->intptr = (int T::*)intptr;
+            return this;
+        }
+
+        /**
+         * Adds an 8-bit signed field.
+         * @return DataSchema*
+         */
+        DataSchema *int8 (int T::*intptr) {
+            (new Field(root, T_INT8))->intptr = intptr;
+            return this;
+        }
+
+        /**
+         * Adds a 16-bit unsigned field (little endian).
+         * @return DataSchema*
+         */
+        DataSchema *uint16 (unsigned int T::*intptr) {
+            (new Field(root, T_UINT16))->intptr = (int T::*)intptr;
+            return this;
+        }
+
+        /**
+         * Adds a 16-bit signed field (little endian).
+         * @return DataSchema*
+         */
+        DataSchema *int16 (int T::*intptr) {
+            (new Field(root, T_INT16))->intptr = intptr;
+            return this;
+        }
+
+        /**
+         * Adds a 16-bit unsigned field (big endian).
+         * @return DataSchema*
+         */
+        DataSchema *uint16be (unsigned int T::*intptr) {
+            (new Field(root, T_UINT16BE))->intptr = (int T::*)intptr;
+            return this;
+        }
+
+        /**
+         * Adds a 16-bit signed field (big endian).
+         * @return DataSchema*
+         */
+        DataSchema *int16be (int T::*intptr) {
+            (new Field(root, T_INT16BE))->intptr = intptr;
+            return this;
+        }
+
+        /**
+         * Adds a 32-bit unsigned field (little endian).
+         * @return DataSchema*
+         */
+        DataSchema *uint32 (unsigned int T::*intptr) {
+            (new Field(root, T_UINT32))->intptr = (int T::*)intptr;
+            return this;
+        }
+
+        /**
+         * Adds a 32-bit signed field (little endian).
+         * @return DataSchema*
+         */
+        DataSchema *int32 (int T::*intptr) {
+            (new Field(root, T_INT32))->intptr = intptr;
+            return this;
+        }
+
+        /**
+         * Adds a 32-bit unsigned field (big endian).
+         * @return DataSchema*
+         */
+        DataSchema *uint32be (unsigned int T::*intptr) {
+            (new Field(root, T_UINT32BE))->intptr = (int T::*)intptr;
+            return this;
+        }
+
+        /**
+         * Adds a 32-bit signed field (big endian).
+         * @return DataSchema*
+         */
+        DataSchema *int32be (int T::*intptr) {
+            (new Field(root, T_INT32BE))->intptr = intptr;
+            return this;
+        }
+
+        /**
+         * Adds a string field, maximum of 255 characters unless explicitly set using `max`.
+         * @return DataSchema*
+         */
+        DataSchema *str (size_t offset, bool is_static=false) {
+            //(new Field(root, T_STR, offset))->is_static = is_static;
+            return this;
+        }
+
+        /* ***** */
+
+        /**
+         * Sets the error code to report when the field is invalid.
+         * @param errorcode Integer error code.
+         * @param errormsg Optional error message.
+         * @return DataSchema*
+         */
+        DataSchema *throws (int errorcode, const char *errormsg = nullptr) {
+            root->children->back()->errorcode = errorcode;
+            root->children->back()->errormsg = errormsg;
+            return this;
+        }
+
+        /**
+         * Add a conditional field (equality), any further fields will be added to it until `end` is called.
+         * @param value Value to compare against.
+         * @return DataSchema*
+         */
+        DataSchema *when (int value) {
+            root = new Field(root->children->back(), T_COND);
+            root->set_cond(new Cond(C_EQ, value));
+            return this;
+        }
+
+        /**
+         * Add a check just in case no other `when` block matches the value.
+         * @return DataSchema*
+         */
+        DataSchema *otherwise() {
+            root = new Field(root->children->back(), T_COND);
+            root->set_cond(new Cond(C_TRUE));
+            return this;
+        }
+
+        /**
+         * Finish the current conditional field and focuses on the parent field.
+         * @return DataSchema*
+         */
+        DataSchema *end() {
+            if (root->parent == nullptr || root->parent->parent == nullptr)
+                throw Error("Cannot end the root field");
+            root = root->parent->parent;
+            return this;
+        }
+
+        /**
+         * Skips certain amount of bytes.
+         * @param num_bytes
+         * @return DataSchema*
+         */
+        DataSchema *skip (int num_bytes) {
+            (new Field(root, T_SKIP))->field_num_bytes = num_bytes;
+            return this;
+        }
+
+        /**
+         * Sets the value of a state.
+         * @param state_index Index from 0 to 15.
+         * @param state_value
+         * @return DataSchema*
+         */
+        DataSchema *set_state (int state_index, int state_value)
+        {
+            if (state_index < 0 || state_index > 15)
+                throw Error("Invalid message state index");
+
+            Field *f = new Field(root, T_SET_STATE);
+            f->state_index = state_index;
+            f->state_value = state_value;
+            return this;
+        }
+
+        /**
+         * Saves the current action value to a state.
+         * @param state_index Index from 0 to 15.
+         * @return DataSchema*
+         */
+        DataSchema *save_to_state (int state_index)
+        {
+            if (state_index < 0 || state_index > 15)
+                throw Error("Invalid message state index");
+
+            root->children->back()->state_index = state_index;
+            return this;
+        }
+
+        /**
+         * Loads the value of a state.
+         * @param state_index
+         * @return DataSchema*
+         */
+        DataSchema *with_state (int state_index) {
+            (new Field(root, T_WITH_STATE))->state_index = state_index;
+            return this;
+        }
+
+        /**
+         * Calls a function on the object.
+         * @param fnptr
+         * @return DataSchema*
+         */
+        DataSchema *call (int (T::*fnptr)()) {
+            (new Field(root, T_CALL))->fnptr = fnptr;
+            return this;
+        }
+    };
+};
+
+#endif

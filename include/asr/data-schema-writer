@@ -1,0 +1,83 @@
+#ifndef __ASR_NET_MESSAGE_WRITER_H
+#define __ASR_NET_MESSAGE_WRITER_H
+
+#include <asr/message-schema>
+#include <asr/buffer>
+
+namespace asr {
+
+    /**
+     * Encodes data using a schema.
+     */
+    class MessageWriter
+    {
+        public:
+
+        /**
+         * The message schema to use for the data.
+         */
+        const MessageSchema *schema;
+
+        /**
+         * The current field being read.
+         */
+        MessageSchema::Field *field;
+
+        /**
+         * State values.
+         */
+        int state[16];
+
+        /**
+         */
+        MessageWriter (const MessageSchema *schema) 
+            : schema(schema)
+        {
+            reset();
+            reset_state();
+        }
+
+        virtual ~MessageWriter()
+        { }
+
+        /**
+         * Resets the encoder to start reading from the root field.
+         */
+        void reset() {
+            field = schema->root;
+        }
+
+        /**
+         * Resets the state values to zero.
+         */
+        void reset_state() {
+            memset(state, 0, sizeof(state));
+        }
+
+        /**
+         * Writes a message to a buffer from an input structure. Throws Error if the structure is invalid.
+         *
+         * @param output Buffer to write to.
+         * @param input Structure to read from.
+         * @return `true` for success, `false` for failure (not enough buffer space).
+         */
+        bool write (Buffer *output, void *input)
+        {
+            MessageSchema::Field *field = schema->root;
+            while (field != nullptr) {
+                try {
+                    field = field->write(output, (char *)input, state);
+                }
+                catch (MessageSchema::ErrorNotEnoughSpace &e) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+    };
+
+
+};
+
+#endif

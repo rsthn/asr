@@ -2,7 +2,7 @@
 #define __ASR_DEFS_H
 
 #if __WIN32__
-    // Windows Vista and later
+    // Windows Vista and later.
     #define WINVER 0x0600
     #define _WIN32_WINNT 0x0600
 #endif
@@ -21,6 +21,7 @@
 #include <cstdio>
 #include <cassert>
 #include <ctime>
+#include <format>
 
 #include <asr/ptr>
 
@@ -30,30 +31,29 @@
 namespace asr
 {
     /**
-     * @brief Number of memory blocks currently allocated.
+     * Number of memory blocks currently allocated.
      */
     extern uint32_t memblocks;
 
     /**
-     * @brief Amount of bytes currently allocated.
+     * Amount of bytes currently allocated.
      */
     extern uint32_t memsize;
 
     /**
-     * @brief Peak maximum amount of memory used.
+     * Peak maximum amount of memory used.
      */
     extern uint32_t peak_memsize;
 
 
     /**
-     * @brief Returns the current time in milliseconds.
+     * Returns the current time in milliseconds.
      * @return time_t
      */
     time_t millis();
 
-
     /**
-     * @brief Allocates a block of memory of the given size. Never returns NULL because when no memory is
+     * Allocates a block of memory of the given size. Never returns NULL because when no memory is
      * left an internal error will occur.
      * 
      * @param size Amount of bytes to allocate.
@@ -61,68 +61,58 @@ namespace asr
      */
     void *alloc (uint32_t size);
 
-
     /**
-     * @brief Deallocates a previously allocated block of memory. Detects if the block is correct to avoid
+     * Deallocates a previously allocated block of memory. Detects if the block is correct to avoid
      * memory errors.
      * 
      * @param block 
      */
     void dealloc (void *block);
 
-
     /**
-     * @brief Copies the specified string into a newly allocated buffer.
-     * 
-     * @param value String to copy.
-     * @param length Bytes to copy. If 0, the length is calculated using strlen.
-     * @return char*
+     * Checks if the block is still alive.
+     * @param block 
      */
-    char *strclone (const char *value, int length=0);
-
-
-    /**
-     * @brief Returns the next available temporal buffer from the circular queue of temporal buffers. These
-     * are dynamically created (up to 32 buffers of TEMPBUFF_SIZE bytes each), when the `clear` parameter is
-     * true, all buffers will be released and `nullptr` will be returned.
-     * 
-     * @param clear Optional parameter to clear all buffers if `true`.
-     * @return char*
-     */
-    char *tempbuff (bool clear=false);
-
+    bool memblock_alive (void *block);
 
     /**
-     * @brief Converts the given value to string and returns it in a temporal buffer.
-     * @param value 
-     * @return char*
-     */
-    const char *c_str (int value);
-    const char *c_str (uint32_t value);
-    const char *c_str (float value);
-    const char *c_str (double value);
-
-    /**
-     * @brief Enables/disables sending the trace messages to STDOUT.
+     * Enables/disables sending the trace messages to STDOUT.
      */
     void stdtrace (bool value);
 
     /**
-     * @brief Writes a message to the log file.
+     * Writes a message to the log file.
      */
     [[gnu::format(printf,1,2)]]
     void trace (const char *msg, ...);
 
     /**
-     * @brief Writes a message to the log file without the new line character at the end (aka "raw").
+     * Writes a message to the log file without the new line character at the end (aka "raw").
      */
     [[gnu::format(printf,1,2)]]
     void rtrace (const char *msg, ...);
 
     /**
-     * @brief Writes a message to the log file (UNICODE).
+     * Writes a message to the log file (UNICODE).
      */
     void wtrace (const wchar_t *msg, ...);
+
+    /**
+     * Checks if the memory block is still valid (alive) and not null. If not, throws a runtime_error.
+     */
+    #define valid_ptr(memptr) _valid_ptr(memptr, __FILE__, __LINE__)
+
+    template<typename PtrT>
+    PtrT _valid_ptr(PtrT memptr, const char *__file__, int __line__)
+    {
+        if (!memptr)
+            throw std::runtime_error(std::format("used null pointer: {} {}", __FILE__, __LINE__));
+
+        if (!memblock_alive(memptr))
+            throw std::runtime_error(std::format("used after free: {} {}", __FILE__, __LINE__));
+
+        return memptr;
+    }
 
 };
 

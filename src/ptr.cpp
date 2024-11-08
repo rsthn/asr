@@ -3,18 +3,18 @@
 
 namespace asr
 {
-    std::unordered_map<void*, int> *refs::memory = nullptr;
+    std::unordered_map<void*, int> *refs_memory = nullptr;
 
     void *refs::add (void *ptr)
     {
-        if (!memory)
-            memory = new std::unordered_map<void*, int>;
+        if (!refs_memory)
+            refs_memory = new std::unordered_map<void*, int>;
 
         if (!ptr) return ptr;
 
-        auto it = memory->find(ptr);
-        if (it == memory->end())
-            memory->insert({ptr, 1});
+        auto it = refs_memory->find(ptr);
+        if (it == refs_memory->end())
+            refs_memory->insert({ptr, 1});
         else
             it->second++;
         return ptr;
@@ -22,22 +22,22 @@ namespace asr
 
     bool refs::remove (void *ptr)
     {
-        if (!memory || !ptr)
+        if (!refs_memory || !ptr)
             return false;
 
-        auto it = memory->find(ptr);
-        if (it == memory->end() || --it->second > 0)
+        auto it = refs_memory->find(ptr);
+        if (it == refs_memory->end() || --it->second > 0)
             return false;
 
-        memory->erase(it);
+        refs_memory->erase(it);
         return true;
     }
 
     void refs::shutdown()
     {
-        if (memory != nullptr) {
-            delete memory;
-            memory = nullptr;
+        if (refs_memory != nullptr) {
+            delete refs_memory;
+            refs_memory = nullptr;
         }
     }
 };
