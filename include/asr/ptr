@@ -9,8 +9,8 @@ namespace asr
     class refs
     {
         public:
-            static void *add (void *ptr);
-            static bool remove (void *ptr);
+            static const void *add (const void *ptr);
+            static bool remove (const void *ptr);
             static void shutdown();
     };
 

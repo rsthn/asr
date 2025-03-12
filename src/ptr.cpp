@@ -3,12 +3,12 @@
 
 namespace asr
 {
-    std::unordered_map<void*, int> *refs_memory = nullptr;
+    std::unordered_map<const void*, int> *refs_memory = nullptr;
 
-    void *refs::add (void *ptr)
+    const void *refs::add (const void *ptr)
     {
         if (!refs_memory)
-            refs_memory = new std::unordered_map<void*, int>;
+            refs_memory = new std::unordered_map<const void*, int>;
 
         if (!ptr) return ptr;
 
@@ -20,7 +20,7 @@ namespace asr
         return ptr;
     }
 
-    bool refs::remove (void *ptr)
+    bool refs::remove (const void *ptr)
     {
         if (!refs_memory || !ptr)
             return false;
