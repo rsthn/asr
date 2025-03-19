@@ -11,6 +11,7 @@ namespace asr
         public:
             static const void *add (const void *ptr);
             static bool remove (const void *ptr);
+            static int count (const void *ptr);
             static void shutdown();
     };
 
@@ -53,6 +54,10 @@ namespace asr
 
         T* get() const {
             return value;
+        }
+
+        int count() const {
+            return refs::count(value);
         }
 
         void set (T *new_value)

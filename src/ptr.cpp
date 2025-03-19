@@ -33,6 +33,18 @@ namespace asr
         return true;
     }
 
+    int refs::count (const void *ptr)
+    {
+        if (!refs_memory || !ptr)
+            return -1;
+
+        auto it = refs_memory->find(ptr);
+        if (it == refs_memory->end())
+            return 0;
+
+        return it->second;
+    }
+
     void refs::shutdown()
     {
         if (refs_memory != nullptr) {
