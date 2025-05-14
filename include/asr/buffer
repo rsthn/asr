@@ -175,6 +175,10 @@ namespace asr {
          */
         int fill (const char *data, int length);
 
+        int fill (const std::string data) {
+            return fill(data.c_str(), data.length());
+        }
+
         /**
          * Reads data (drain-buffer) into the given buffer and returns the actual number of bytes read.
          * If `release_space` is false the data from the buffer will not be removed and the specified amount of bytes must be in
@@ -206,6 +210,10 @@ namespace asr {
          * @return `true` if successful
          */
         bool write (const char *data, int length=0);
+
+        bool write (const std::string data) {
+            return write(data.c_str(), data.length());
+        }
 
         /**
          * Reads data from the buffer (all or nothing). The output byte at index 'length' will be 
@@ -269,6 +277,10 @@ namespace asr {
          * @return bool
          */
         bool write_str (const char *value, int length=-1);
+
+        bool write_str (const std::string value) {
+            return write_str(value.c_str(), value.length());
+        }
 
         /**
          * Reads a byte from the buffer.
