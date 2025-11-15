@@ -90,6 +90,14 @@ namespace asr
         }
 
         /**
+         * Drops the value (and sets to null) but does not delete it if there are no more references to it.
+         */
+        void drop() {
+            refs::remove(value);
+            value = nullptr;
+        }
+
+        /**
          */
         bool operator== (void *other) const {
             return value == other;
