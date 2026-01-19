@@ -10,6 +10,7 @@
 #include <cstring>
 #include <cwchar>
 #include <chrono>
+#include <new>
 
 namespace asr
 {
@@ -21,39 +22,49 @@ namespace asr
     // Enables trace() messages to be sent to STDOUT instead of the log file.
     bool stdout_trace_enabled = false;
 
-
     time_t millis() {
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::system_clock::now().time_since_epoch()
+		);
         return elapsed.count();
     }
 
+    // Unified header layout (16 bytes before user pointer):
+    // [0-7] raw_ptr (void*) - pointer returned by malloc
+    // [8-11] total_size (uint32_t) - total bytes malloc'd
+    // [12] marker: 'A' = regular, 'B' = aligned
+    // [13-15] padding
+    static constexpr size_t HEADER_SIZE = 16;
 
-    void *alloc (uint32_t size)
+    void* alloc (uint32_t size)
     {
         #if ASR_TRACK_MEMORY == 1
-            uint8_t* buff = (uint8_t*)malloc(5+size);
-            if (!buff) {
+            uint32_t total = HEADER_SIZE + size;
+            uint8_t* raw = (uint8_t*)std::malloc(total);
+            if (!raw) {
                 trace("ERROR: Not enough memory to allocate block of size %u.\n", size);
                 exit(1);
             }
 
-            *buff = 'A';
-            *((uint32_t *)(buff+1)) = size;
+            uint8_t* header = raw;
+            uint8_t* user_ptr = raw + HEADER_SIZE;
+
+            *((void**)header) = raw;
+            *((uint32_t*)(header + 8)) = total;
+            *(header + 12) = 'A';
 
             memblocks++;
-            memsize += 5+size;
+            memsize += total;
             if (memsize > peak_memsize)
                 peak_memsize = memsize;
 
-            return (void*)(buff+5);
-
+            return user_ptr;
         #else
-            return malloc(size);
+            return std::malloc(size);
         #endif
     }
 
-
-    void dealloc (void *block)
+    void dealloc (void* block)
     {
         if (!block) {
             trace("ERROR: Deallocating NULL block.\n");
@@ -62,38 +73,76 @@ namespace asr
         }
 
         #if ASR_TRACK_MEMORY == 1
-            uint8_t *buff = ((uint8_t *)block) - 5;
+            uint8_t* header = ((uint8_t*)block) - HEADER_SIZE;
+            uint8_t marker = *(header + 12);
 
-            if (*buff != 'A') {
-                trace("ERROR: Deallocating invalid or already deallocated block: %08lx\n", buff);
+            if (marker != 'A' && marker != 'B') {
+                trace("ERROR: Deallocating invalid or already deallocated block: %p\n", block);
                 exit(1);
                 return;
             }
 
-            *buff = 'D';
-            memblocks--;
-            memsize -= *((uint32_t *)(buff+1)) + 5;
-            free(buff);
+            void* raw = *((void**)header);
+            uint32_t total = *((uint32_t*)(header + 8));
 
+            *(header + 12) = 'D';
+            memblocks--;
+            memsize -= total;
+            std::free(raw);
         #else
-            free(block);
+            std::free(block);
         #endif
     }
 
-
-    bool memblock_alive (void *block)
+    bool memblock_alive (void* block)
     {
         if (block == nullptr)
             return false;
 
         #if ASR_TRACK_MEMORY == 1
-            uint8_t *buff = ((uint8_t *)block) - 5;
-            return *buff == 'A';
+            uint8_t* header = ((uint8_t*)block) - HEADER_SIZE;
+            uint8_t marker = *(header + 12);
+            return marker == 'A' || marker == 'B';
         #else
             return true;
         #endif
     }
 
+    void* alloc_aligned (size_t size, size_t alignment)
+    {
+        if (alignment <= alignof(std::max_align_t))
+            return alloc(size);
+
+        // Allocate extra space for alignment and header
+        size_t total = size + alignment + HEADER_SIZE;
+        uint8_t* raw = (uint8_t*)std::malloc(total);
+        if (!raw) {
+            asr::trace("ERROR: Not enough memory to allocate aligned block of size %zu.\n", size);
+            throw std::bad_alloc();
+        }
+
+        // Align the user pointer
+        uintptr_t raw_addr = (uintptr_t)(raw + HEADER_SIZE);
+        uintptr_t aligned_addr = (raw_addr + alignment - 1) & ~(alignment - 1);
+        uint8_t* user_ptr = (uint8_t*)aligned_addr;
+
+        // Store header
+        uint8_t* header = user_ptr - HEADER_SIZE;
+        *((void**)header) = raw;
+        *((uint32_t*)(header + 8)) = (uint32_t)total;
+        *(header + 12) = 'B';
+
+        memblocks++;
+        memsize += total;
+        if (memsize > peak_memsize)
+            peak_memsize = memsize;
+
+        return user_ptr;
+    }
+
+    void dealloc_aligned (void* block, size_t) noexcept {
+        dealloc(block);
+    }
 
     /**
      * Variables required for the trace functions.
@@ -171,7 +220,6 @@ namespace asr
         fflush (fp);
     }
 
-
     void wtrace (const wchar_t *msg, ...)
     {
         FILE *fp = trace_fp;
@@ -230,7 +278,6 @@ namespace asr
         return 0;
     }
 
-
     /**
      * Allocates a new console or attaches to the parent's console.
      */
@@ -255,7 +302,6 @@ namespace asr
         initConsole();
     }
 
-
     /**
      * Automatically enable ANSI escape codes in the console.
      */
@@ -266,27 +312,111 @@ namespace asr
 
 #if ASR_TRACK_MEMORY == 1
 
-/**
- * Global override of the "new" operator to match the ASR's memory protection functions.
- */
-__attribute__((used)) void *operator new (size_t size) {
-    return asr::alloc(size);
+// Standard allocation/deallocation (C++11)
+[[nodiscard]] void* operator new (std::size_t size) {
+    void* p = asr::alloc(size);
+    if (!p) throw std::bad_alloc();
+    return p;
 }
 
-__attribute__((used)) void *operator new[] (size_t size) {
-    return asr::alloc(size);
+[[nodiscard]] void* operator new[] (std::size_t size) {
+    void* p = asr::alloc(size);
+    if (!p) throw std::bad_alloc();
+    return p;
 }
 
-
-/**
- * Global override of the "delete" operator to match the ASR's memory protection functions.
- */
-__attribute__((used)) void operator delete (void *block) noexcept {
-    asr::dealloc(block);
+void operator delete (void* ptr) noexcept {
+    asr::dealloc(ptr);
 }
 
-__attribute__((used)) void operator delete[] (void *block) noexcept {
-    asr::dealloc(block);
+void operator delete[] (void* ptr) noexcept {
+    asr::dealloc(ptr);
+}
+
+// Sized deallocation (C++14)
+void operator delete (void* ptr, std::size_t) noexcept {
+    asr::dealloc(ptr);
+}
+
+void operator delete[] (void* ptr, std::size_t) noexcept
+{
+    asr::dealloc(ptr);
+}
+
+// Aligned allocation and deallocation (C++17)
+[[nodiscard]] void* operator new (std::size_t size, std::align_val_t align) {
+    return asr::alloc_aligned(size, static_cast<std::size_t>(align));
+}
+
+[[nodiscard]] void* operator new[] (std::size_t size, std::align_val_t align) {
+    return asr::alloc_aligned(size, static_cast<std::size_t>(align));
+}
+
+void operator delete (void* ptr, std::align_val_t align) noexcept {
+    asr::dealloc_aligned(ptr, static_cast<std::size_t>(align));
+}
+
+void operator delete[] (void* ptr, std::align_val_t align) noexcept {
+    asr::dealloc_aligned(ptr, static_cast<std::size_t>(align));
+}
+
+// Sized + aligned deallocation (C++17)
+void operator delete (void* ptr, std::size_t, std::align_val_t align) noexcept {
+    asr::dealloc_aligned(ptr, static_cast<std::size_t>(align));
+}
+
+void operator delete[] (void* ptr, std::size_t, std::align_val_t align) noexcept {
+    asr::dealloc_aligned(ptr, static_cast<std::size_t>(align));
+}
+
+// Nothrow versions
+[[nodiscard]] void* operator new (std::size_t size, const std::nothrow_t&) noexcept {
+    try {
+        return asr::alloc(size);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+[[nodiscard]] void* operator new[] (std::size_t size, const std::nothrow_t&) noexcept {
+    try {
+        return asr::alloc(size);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+void operator delete (void* ptr, const std::nothrow_t&) noexcept {
+    asr::dealloc(ptr);
+}
+
+void operator delete[] (void* ptr, const std::nothrow_t&) noexcept {
+    asr::dealloc(ptr);
+}
+
+// Aligned nothrow versions (C++17)
+[[nodiscard]] void* operator new (std::size_t size, std::align_val_t align, const std::nothrow_t&) noexcept {
+    try {
+        return asr::alloc_aligned(size, static_cast<std::size_t>(align));
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+[[nodiscard]] void* operator new[] (std::size_t size, std::align_val_t align, const std::nothrow_t&) noexcept {
+    try {
+        return asr::alloc_aligned(size, static_cast<std::size_t>(align));
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+void operator delete (void* ptr, std::align_val_t align, const std::nothrow_t&) noexcept {
+    asr::dealloc_aligned(ptr, static_cast<std::size_t>(align));
+}
+
+void operator delete[] (void* ptr, std::align_val_t align, const std::nothrow_t&) noexcept {
+    asr::dealloc_aligned(ptr, static_cast<std::size_t>(align));
 }
 
 #endif

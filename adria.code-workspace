@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "src"
+		},
+		{
+			"path": "utils"
 		}
     ],
     "settings": {
@@ -69,6 +72,7 @@
             "message-schema": "cpp",
             "error": "cpp",
             "defs": "cpp"
-        }
+        },
+        "svn.ignoreMissingSvnWarning": true
     }
 }

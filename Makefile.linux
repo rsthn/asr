@@ -8,7 +8,8 @@ EXAMPLES = examples/event_bus examples/refs examples/udp_client examples/udp_ser
 
 CC = clang++
 CCFLAGS = -Qunused-arguments -Wno-format-security -fcolor-diagnostics -fansi-escape-codes -Wno-format -std=c++23 \
-		  -Iinclude -Llib -O1 -Wl,-s -static -pthread -static-libstdc++ -static-libgcc -Wno-switch -g
+		  -DASR_TRACK_MEMORY=1 -fno-lto -fno-builtin-operator-new -fno-builtin-operator-delete \
+		  -Iinclude -Llib -O0 -Wl,-s -static -pthread -static-libstdc++ -static-libgcc -Wno-switch -g
 
 vpath %.cpp src:examples:utils
 
@@ -48,17 +49,17 @@ lib: obj-folder lib-folder msg-1 $(OBJS)
 
 install: lib
 	@echo [97mDeploying include files ... [0m
-	@rm -rf /usr/local/include/asr
-	@cp -r include/asr /usr/local/include
+	@sudo rm -rf /usr/local/include/asr
+	@sudo cp -r include/asr /usr/local/include
 	@echo [97mDeploying lib files ... [0m
-	@cp -r lib/libasr* /usr/local/lib
+	@sudo cp -r lib/libasr* /usr/local/lib
 	@echo [97mDone[0m
 
 uninstall:
 	@echo [97mRemoving include files ... [0m
-	@rm -rf /usr/local/include/asr
+	@sudo rm -rf /usr/local/include/asr
 	@echo [97mRemoving library files ... [0m
-	@rm -rf /usr/local/lib/libasr*
+	@sudo rm -rf /usr/local/lib/libasr*
 
 msg-2:
 	@echo [97mBulding examples ... [0m
